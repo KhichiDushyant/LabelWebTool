@@ -146,13 +146,21 @@ def project_detail(project_id):
     if not current_user.can_access_project(project):
         return render_template('403.html'), 403
     
-    images = Image.query.filter_by(project_id=project_id).all()
-    labels = Label.query.filter_by(project_id=project_id).all()
-    
-    return render_template('project_detail.html', 
-                         project=project, 
-                         images=images, 
-                         labels=labels)
+    if project.project_type == ProjectType.VIDEO:
+        # Get video frames instead of images
+        video_frames = VideoFrame.query.filter_by(project_id=project_id).all()
+        labels = Label.query.filter_by(project_id=project_id).all()
+        return render_template('project_detail.html', 
+                             project=project, 
+                             video_frames=video_frames,
+                             labels=labels)
+    else:
+        images = Image.query.filter_by(project_id=project_id).all()
+        labels = Label.query.filter_by(project_id=project_id).all()
+        return render_template('project_detail.html', 
+                             project=project, 
+                             images=images, 
+                             labels=labels)
 
 @app.route('/projects/<int:project_id>/upload', methods=['POST'])
 @require_login
@@ -233,6 +241,17 @@ def serve_image(project_id, image_id):
     
     return send_file(image.filepath)
 
+@app.route('/projects/<int:project_id>/frames/<int:frame_id>')
+@require_login
+def serve_video_frame(project_id, frame_id):
+    project = Project.query.get_or_404(project_id)
+    frame = VideoFrame.query.get_or_404(frame_id)
+    
+    if not current_user.can_access_project(project) or frame.project_id != project_id:
+        return render_template('403.html'), 403
+    
+    return send_file(frame.thumbnail_path)
+
 @app.route('/annotate/<int:image_id>')
 @require_login
 def annotate_image(image_id):
@@ -259,24 +278,68 @@ def annotate_image(image_id):
                          prev_image=prev_image,
                          next_image=next_image)
 
+@app.route('/annotate/frame/<int:frame_id>')
+@require_login
+def annotate_video_frame(frame_id):
+    frame = VideoFrame.query.get_or_404(frame_id)
+    
+    if not current_user.can_access_project(frame.project):
+        return render_template('403.html'), 403
+    
+    annotations = VideoAnnotation.query.filter_by(frame_id=frame_id).all()
+    labels = Label.query.filter_by(project_id=frame.project_id).all()
+    
+    # Get next and previous frames in the project
+    all_frames = VideoFrame.query.filter_by(project_id=frame.project_id)\
+                                 .order_by(VideoFrame.frame_number).all()
+    
+    current_index = next((i for i, f in enumerate(all_frames) if f.id == frame_id), 0)
+    prev_frame = all_frames[current_index - 1] if current_index > 0 else None
+    next_frame = all_frames[current_index + 1] if current_index < len(all_frames) - 1 else None
+    
+    return render_template('annotate_frame.html',
+                         frame=frame,
+                         annotations=annotations,
+                         labels=labels,
+                         prev_frame=prev_frame,
+                         next_frame=next_frame)
+
 @app.route('/api/annotations', methods=['POST'])
 @require_login
 def create_annotation():
     data = request.get_json()
     
-    image = Image.query.get_or_404(data['image_id'])
-    if not current_user.can_access_project(image.project):
-        return jsonify({'error': 'Access denied'}), 403
-    
-    annotation = Annotation(
-        image_id=data['image_id'],
-        label_id=data['label_id'],
-        user_id=current_user.id,
-        x=data['x'],
-        y=data['y'],
-        width=data['width'],
-        height=data['height']
-    )
+    # Handle both image and video frame annotations
+    if 'image_id' in data:
+        image = Image.query.get_or_404(data['image_id'])
+        if not current_user.can_access_project(image.project):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        annotation = Annotation(
+            image_id=data['image_id'],
+            label_id=data['label_id'],
+            user_id=current_user.id,
+            x=data['x'],
+            y=data['y'],
+            width=data['width'],
+            height=data['height']
+        )
+    elif 'frame_id' in data:
+        frame = VideoFrame.query.get_or_404(data['frame_id'])
+        if not current_user.can_access_project(frame.project):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        annotation = VideoAnnotation(
+            frame_id=data['frame_id'],
+            label_id=data['label_id'],
+            user_id=current_user.id,
+            x=data['x'],
+            y=data['y'],
+            width=data['width'],
+            height=data['height']
+        )
+    else:
+        return jsonify({'error': 'Either image_id or frame_id is required'}), 400
     
     db.session.add(annotation)
     db.session.commit()
@@ -289,17 +352,27 @@ def create_annotation():
 @app.route('/api/annotations/<int:annotation_id>', methods=['PUT'])
 @require_login
 def update_annotation(annotation_id):
-    annotation = Annotation.query.get_or_404(annotation_id)
+    # Try both image and video annotations
+    annotation = Annotation.query.filter_by(id=annotation_id).first()
+    video_annotation = VideoAnnotation.query.filter_by(id=annotation_id).first()
     
-    if not current_user.can_access_project(annotation.image.project):
-        return jsonify({'error': 'Access denied'}), 403
+    if annotation:
+        if not current_user.can_access_project(annotation.image.project):
+            return jsonify({'error': 'Access denied'}), 403
+        target_annotation = annotation
+    elif video_annotation:
+        if not current_user.can_access_project(video_annotation.frame.project):
+            return jsonify({'error': 'Access denied'}), 403
+        target_annotation = video_annotation
+    else:
+        return jsonify({'error': 'Annotation not found'}), 404
     
     data = request.get_json()
-    annotation.x = data['x']
-    annotation.y = data['y']
-    annotation.width = data['width']
-    annotation.height = data['height']
-    annotation.label_id = data['label_id']
+    target_annotation.x = data['x']
+    target_annotation.y = data['y']
+    target_annotation.width = data['width']
+    target_annotation.height = data['height']
+    target_annotation.label_id = data['label_id']
     
     db.session.commit()
     
