@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}Annotate Frame {{ frame.frame_number }} - {{ frame.project.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-2">
+    <div class="row">
+        <!-- Main Annotation Area -->
+        <div class="col-lg-9">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Frame {{ frame.frame_number }}</h5>
+                        <small class="text-muted">{{ "%.2f"|format(frame.timestamp) }}s • {{ frame.width }}×{{ frame.height }}</small>
+                    </div>
+                    
+                    <div class="btn-group">
+                        {% if prev_frame %}
+                        <a href="{{ url_for('annotate_video_frame', frame_id=prev_frame.id) }}" 
+                           class="btn btn-outline-secondary btn-sm" id="prevBtn">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                        {% endif %}
+                        
+                        {% if next_frame %}
+                        <a href="{{ url_for('annotate_video_frame', frame_id=next_frame.id) }}" 
+                           class="btn btn-outline-secondary btn-sm" id="nextBtn">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-body p-0">
+                    <div class="annotation-container" style="position: relative; background: #000;">
+                        <canvas id="annotationCanvas" 
+                                style="display: block; max-width: 100%; cursor: crosshair;"
+                                data-frame-id="{{ frame.id }}"
+                                data-frame-width="{{ frame.width }}"
+                                data-frame-height="{{ frame.height }}">
+                        </canvas>
+                        
+                        <!-- Annotation Controls Overlay -->
+                        <div class="annotation-controls position-absolute" style="top: 10px; left: 10px; z-index: 10;">
+                            <div class="btn-group-vertical">
+                                <button class="btn btn-sm btn-primary" id="zoomInBtn" title="Zoom In (Z)">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                                <button class="btn btn-sm btn-primary" id="zoomOutBtn" title="Zoom Out (X)">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <button class="btn btn-sm btn-secondary" id="resetZoomBtn" title="Reset Zoom (R)">
+                                    <i class="fas fa-expand-arrows-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Keyboard Shortcuts Help -->
+                        <div class="position-absolute" style="bottom: 10px; right: 10px; z-index: 10;">
+                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#shortcutsModal">
+                                <i class="fas fa-keyboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center">
+                                <span class="me-3">Annotations: <span id="annotationCount">{{ annotations|length }}</span></span>
+                                <button class="btn btn-sm btn-danger" id="deleteBtn" disabled>
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button class="btn btn-sm btn-success" id="saveBtn" disabled>
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-3">
+            <!-- Labels Panel -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Labels</h6>
+                </div>
+                <div class="card-body">
+                    {% for label in labels %}
+                    <div class="label-item d-flex align-items-center mb-2 p-2 border rounded" 
+                         data-label-id="{{ label.id }}" 
+                         data-label-color="{{ label.color }}"
+                         style="cursor: pointer;">
+                        <div class="me-2" style="width: 16px; height: 16px; background-color: {{ label.color }}; border-radius: 2px;"></div>
+                        <span class="flex-grow-1">{{ label.name }}</span>
+                        <kbd class="small">{{ loop.index }}</kbd>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not labels %}
+                    <p class="text-muted small">No labels available</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Annotations List -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Current Annotations</h6>
+                </div>
+                <div class="card-body">
+                    <div id="annotationsList">
+                        {% for annotation in annotations %}
+                        <div class="annotation-item border rounded p-2 mb-2" data-annotation-id="{{ annotation.id }}">
+                            <div class="d-flex align-items-center">
+                                <div class="me-2" style="width: 12px; height: 12px; background-color: {{ annotation.label.color }}; border-radius: 2px;"></div>
+                                <small class="flex-grow-1">{{ annotation.label.name }}</small>
+                                <small class="text-muted">{{ "%.0f"|format(annotation.width) }}×{{ "%.0f"|format(annotation.height) }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div id="noAnnotations" {% if annotations %}style="display: none;"{% endif %}>
+                        <p class="text-muted small">No annotations yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Keyboard Shortcuts Modal -->
+<div class="modal fade" id="shortcutsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Keyboard Shortcuts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Navigation</h6>
+                        <ul class="list-unstyled">
+                            <li><kbd>←</kbd> Previous frame</li>
+                            <li><kbd>→</kbd> Next frame</li>
+                            <li><kbd>Escape</kbd> Cancel drawing</li>
+                        </ul>
+                        
+                        <h6>Zoom & View</h6>
+                        <ul class="list-unstyled">
+                            <li><kbd>Z</kbd> Zoom in</li>
+                            <li><kbd>X</kbd> Zoom out</li>
+                            <li><kbd>R</kbd> Reset zoom</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Labels</h6>
+                        <ul class="list-unstyled">
+                            {% for label in labels %}
+                            <li><kbd>{{ loop.index }}</kbd> {{ label.name }}</li>
+                            {% endfor %}
+                        </ul>
+                        
+                        <h6>Actions</h6>
+                        <ul class="list-unstyled">
+                            <li><kbd>Delete</kbd> Delete selected</li>
+                            <li><kbd>Ctrl+S</kbd> Save changes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/annotation.js') }}"></script>
+
+<script>
+// Initialize annotation tool for video frames
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('annotationCanvas');
+    const frameId = canvas.dataset.frameId;
+    const frameWidth = parseInt(canvas.dataset.frameWidth);
+    const frameHeight = parseInt(canvas.dataset.frameHeight);
+    
+    // Load frame image
+    const frameUrl = `/projects/{{ frame.project_id }}/frames/{{ frame.id }}`;
+    
+    // Prepare labels data
+    const labelsData = [
+        {% for label in labels %}
+        {
+            id: {{ label.id }},
+            name: "{{ label.name }}",
+            color: "{{ label.color }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // Prepare annotations data
+    const annotationsData = [
+        {% for annotation in annotations %}
+        {
+            id: {{ annotation.id }},
+            x: {{ annotation.x }},
+            y: {{ annotation.y }},
+            width: {{ annotation.width }},
+            height: {{ annotation.height }},
+            label_id: {{ annotation.label_id }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // Initialize annotation tool
+    const annotationTool = new AnnotationTool({
+        canvas: canvas,
+        imageUrl: frameUrl,
+        imageWidth: frameWidth,
+        imageHeight: frameHeight,
+        labels: labelsData,
+        annotations: annotationsData,
+        annotationIds: [{% for annotation in annotations %}{{ annotation.id }}{% if not loop.last %},{% endif %}{% endfor %}],
+        labelIds: [{% for annotation in annotations %}{{ annotation.label_id }}{% if not loop.last %},{% endif %}{% endfor %}],
+        isVideoFrame: true,
+        frameId: frameId
+    });
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        // Don't trigger shortcuts when typing in inputs
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        switch(e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                {% if prev_frame %}
+                window.location.href = '{{ url_for("annotate_video_frame", frame_id=prev_frame.id) }}';
+                {% endif %}
+                break;
+                
+            case 'ArrowRight':
+                e.preventDefault();
+                {% if next_frame %}
+                window.location.href = '{{ url_for("annotate_video_frame", frame_id=next_frame.id) }}';
+                {% endif %}
+                break;
+                
+            case 'z':
+            case 'Z':
+                e.preventDefault();
+                annotationTool.zoomIn();
+                break;
+                
+            case 'x':
+            case 'X':
+                e.preventDefault();
+                annotationTool.zoomOut();
+                break;
+                
+            case 'r':
+            case 'R':
+                e.preventDefault();
+                annotationTool.resetZoom();
+                break;
+                
+            case 'Escape':
+                e.preventDefault();
+                annotationTool.cancelDrawing();
+                break;
+                
+            case 'Delete':
+                e.preventDefault();
+                annotationTool.deleteSelectedAnnotation();
+                break;
+        }
+        
+        // Number keys for label selection
+        if (e.key >= '1' && e.key <= '9') {
+            const labelIndex = parseInt(e.key) - 1;
+            if (labelIndex < labelsData.length) {
+                annotationTool.setSelectedLabel(labelsData[labelIndex].id);
+                // Update UI to show selected label
+                document.querySelectorAll('.label-item').forEach(item => {
+                    item.classList.remove('bg-primary', 'text-white');
+                });
+                document.querySelectorAll('.label-item')[labelIndex]?.classList.add('bg-primary', 'text-white');
+            }
+        }
+        
+        // Save shortcut
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            const unsaved = annotationTool.getUnsavedAnnotations();
+            if (unsaved.length > 0) {
+                // Save annotations logic here
+                console.log('Saving annotations...', unsaved);
+            }
+        }
+    });
+    
+    // Label selection
+    document.querySelectorAll('.label-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const labelId = parseInt(this.dataset.labelId);
+            annotationTool.setSelectedLabel(labelId);
+            
+            // Update UI
+            document.querySelectorAll('.label-item').forEach(label => {
+                label.classList.remove('bg-primary', 'text-white');
+            });
+            this.classList.add('bg-primary', 'text-white');
+        });
+    });
+    
+    // Zoom controls
+    document.getElementById('zoomInBtn').addEventListener('click', () => annotationTool.zoomIn());
+    document.getElementById('zoomOutBtn').addEventListener('click', () => annotationTool.zoomOut());
+    document.getElementById('resetZoomBtn').addEventListener('click', () => annotationTool.resetZoom());
+    
+    // Delete button
+    document.getElementById('deleteBtn').addEventListener('click', () => {
+        annotationTool.deleteSelectedAnnotation();
+    });
+    
+    // Update UI when annotations change
+    annotationTool.canvas.addEventListener('annotationChanged', function() {
+        const count = annotationTool.getAnnotationCount();
+        document.getElementById('annotationCount').textContent = count;
+        
+        const hasUnsaved = annotationTool.getUnsavedAnnotations().length > 0;
+        document.getElementById('saveBtn').disabled = !hasUnsaved;
+    });
+    
+    // Update UI when annotation is selected
+    annotationTool.canvas.addEventListener('annotationSelected', function(e) {
+        const hasSelection = e.detail.annotation !== null;
+        document.getElementById('deleteBtn').disabled = !hasSelection;
+    });
+});
+</script>
+{% endblock %}

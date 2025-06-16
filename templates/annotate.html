@@ -328,21 +328,89 @@ document.getElementById('saveBtn').addEventListener('click', function() {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-        const selected = annotationTool.getSelectedAnnotation();
-        if (selected && confirm('Delete selected annotation?')) {
-            annotationTool.deleteSelectedAnnotation();
-            updateAnnotationsList();
+    // Don't trigger shortcuts when typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+    }
+    
+    switch(e.key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            {% if prev_image %}
+            window.location.href = '{{ url_for("annotate_image", image_id=prev_image.id) }}';
+            {% endif %}
+            break;
+            
+        case 'ArrowRight':
+            e.preventDefault();
+            {% if next_image %}
+            window.location.href = '{{ url_for("annotate_image", image_id=next_image.id) }}';
+            {% endif %}
+            break;
+            
+        case 'z':
+        case 'Z':
+            if (!e.ctrlKey) {
+                e.preventDefault();
+                annotationTool.zoomIn();
+            }
+            break;
+            
+        case 'x':
+        case 'X':
+            e.preventDefault();
+            annotationTool.zoomOut();
+            break;
+            
+        case 'r':
+        case 'R':
+            e.preventDefault();
+            annotationTool.resetZoom();
+            break;
+            
+        case 'Delete':
+        case 'Backspace':
+            e.preventDefault();
+            const selected = annotationTool.getSelectedAnnotation();
+            if (selected && confirm('Delete selected annotation?')) {
+                annotationTool.deleteSelectedAnnotation();
+                updateAnnotationsList();
+            }
+            break;
+            
+        case 'Escape':
+            e.preventDefault();
+            annotationTool.cancelDrawing();
+            break;
+            
+        case '+':
+        case '=':
+            e.preventDefault();
+            annotationTool.zoomIn();
+            break;
+            
+        case '-':
+            e.preventDefault();
+            annotationTool.zoomOut();
+            break;
+    }
+    
+    // Number keys for label selection
+    if (e.key >= '1' && e.key <= '9') {
+        const labelIndex = parseInt(e.key) - 1;
+        const labels = {{ labels|tojson }};
+        if (labelIndex < labels.length) {
+            const labelItems = document.querySelectorAll('.label-item');
+            if (labelItems[labelIndex]) {
+                labelItems[labelIndex].click();
+            }
         }
-    } else if (e.key === 'Escape') {
-        annotationTool.cancelDrawing();
-    } else if (e.ctrlKey && e.key === 's') {
+    }
+    
+    // Save shortcut
+    if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
         document.getElementById('saveBtn').click();
-    } else if (e.key === '+' || e.key === '=') {
-        annotationTool.zoomIn();
-    } else if (e.key === '-') {
-        annotationTool.zoomOut();
     }
 });
 
