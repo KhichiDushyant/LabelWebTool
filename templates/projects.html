@@ -33,6 +33,20 @@
                         <p class="card-text text-muted">{{ project.description or 'No description provided' }}</p>
                         
                         <div class="row g-2 mb-3">
+                            {% if project.project_type.value == 'video' %}
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light bg-opacity-10 rounded">
+                                    <div class="fw-bold">{{ project.total_frames or 0 }}</div>
+                                    <small class="text-muted">Frames</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light bg-opacity-10 rounded">
+                                    <div class="fw-bold">{{ project.video_duration or 0 }}s</div>
+                                    <small class="text-muted">Duration</small>
+                                </div>
+                            </div>
+                            {% else %}
                             <div class="col-6">
                                 <div class="text-center p-2 bg-light bg-opacity-10 rounded">
                                     <div class="fw-bold">{{ project.total_images }}</div>
@@ -45,6 +59,7 @@
                                     <small class="text-muted">Annotated</small>
                                 </div>
                             </div>
+                            {% endif %}
                         </div>
                         
                         <div class="mb-3">
@@ -70,10 +85,22 @@
                             <a href="{{ url_for('project_detail', project_id=project.id) }}" class="btn btn-outline-primary btn-sm flex-grow-1">
                                 <i class="fas fa-eye me-1"></i>View
                             </a>
-                            {% if project.total_images > 0 %}
-                            <a href="{{ url_for('annotate_image', image_id=project.images[0].id) }}" class="btn btn-primary btn-sm flex-grow-1">
-                                <i class="fas fa-edit me-1"></i>Annotate
-                            </a>
+                            {% if project.project_type.value == 'video' %}
+                                {% if project.processing_status == 'processing' %}
+                                <button class="btn btn-secondary btn-sm flex-grow-1" disabled>
+                                    <i class="fas fa-spinner fa-spin me-1"></i>Processing
+                                </button>
+                                {% elif project.total_frames and project.total_frames > 0 %}
+                                <a href="{{ url_for('project_detail', project_id=project.id) }}" class="btn btn-primary btn-sm flex-grow-1">
+                                    <i class="fas fa-edit me-1"></i>Annotate
+                                </a>
+                                {% endif %}
+                            {% else %}
+                                {% if project.total_images > 0 and project.images|length > 0 %}
+                                <a href="{{ url_for('annotate_image', image_id=project.images[0].id) }}" class="btn btn-primary btn-sm flex-grow-1">
+                                    <i class="fas fa-edit me-1"></i>Annotate
+                                </a>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>

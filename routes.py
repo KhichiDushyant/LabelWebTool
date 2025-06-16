@@ -107,12 +107,13 @@ def new_project():
                     project.processing_status = 'processing'
                     db.session.commit()
                     
-                    # Extract frames with custom interval
+                    # Start frame extraction in background
                     try:
+                        # For now, extract frames synchronously but improve UI feedback
                         extracted_frames = extract_video_frames(video_info['filepath'], project.id, frame_interval)
                         project.processing_status = 'completed'
                         db.session.commit()
-                        flash(f'Video uploaded! Extracted {len(extracted_frames)} frames for annotation.', 'success')
+                        flash(f'Video uploaded successfully! Extracted {len(extracted_frames)} frames for annotation.', 'success')
                     except Exception as e:
                         project.processing_status = 'failed'
                         db.session.commit()

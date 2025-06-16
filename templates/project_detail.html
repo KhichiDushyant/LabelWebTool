@@ -29,9 +29,21 @@
                 </ul>
             </div>
             
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                <i class="fas fa-upload me-2"></i>Upload Images
-            </button>
+            {% if project.project_type.value == 'video' %}
+                {% if project.processing_status == 'processing' %}
+                <button type="button" class="btn btn-secondary" disabled>
+                    <i class="fas fa-spinner fa-spin me-2"></i>Processing Video
+                </button>
+                {% else %}
+                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#reextractModal">
+                    <i class="fas fa-video me-2"></i>Re-extract Frames
+                </button>
+                {% endif %}
+            {% else %}
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="fas fa-upload me-2"></i>Upload Images
+                </button>
+            {% endif %}
         </div>
     </div>
 
@@ -40,8 +52,13 @@
         <div class="col-md-3">
             <div class="card bg-primary bg-opacity-10 border-primary">
                 <div class="card-body text-center">
+                    {% if project.project_type.value == 'video' %}
+                    <h4 class="text-primary">{{ video_frames|length if video_frames else 0 }}</h4>
+                    <small class="text-muted">Total Frames</small>
+                    {% else %}
                     <h4 class="text-primary">{{ project.total_images }}</h4>
                     <small class="text-muted">Total Images</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -88,49 +105,113 @@
     </div>
 
     <div class="row">
-        <!-- Images Grid -->
+        <!-- Images/Frames Grid -->
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
+                    {% if project.project_type.value == 'video' %}
+                    <h5 class="mb-0">Video Frames</h5>
+                    <small class="text-muted">{{ video_frames|length if video_frames else 0 }} total</small>
+                    {% else %}
                     <h5 class="mb-0">Images</h5>
-                    <small class="text-muted">{{ images|length }} total</small>
+                    <small class="text-muted">{{ images|length if images else 0 }} total</small>
+                    {% endif %}
                 </div>
                 <div class="card-body">
-                    {% if images %}
-                        <div class="row g-3">
-                            {% for image in images %}
-                            <div class="col-md-4 col-sm-6">
-                                <div class="card image-card">
-                                    <div class="position-relative">
-                                        <img src="{{ url_for('serve_image', project_id=project.id, image_id=image.id) }}" 
-                                             class="card-img-top" alt="{{ image.original_filename }}"
-                                             style="height: 150px; object-fit: cover;">
-                                        
-                                        {% if image.is_annotated %}
-                                        <span class="position-absolute top-0 start-0 m-2">
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-check"></i>
+                    {% if project.project_type.value == 'video' %}
+                        {% if project.processing_status == 'processing' %}
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Processing video...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Extracting frames from video...</p>
+                        </div>
+                        {% elif video_frames %}
+                            <div class="row g-3">
+                                {% for frame in video_frames %}
+                                <div class="col-md-4 col-sm-6">
+                                    <div class="card image-card">
+                                        <div class="position-relative">
+                                            <img src="{{ url_for('serve_video_frame', project_id=project.id, frame_id=frame.id) }}" 
+                                                 class="card-img-top" alt="Frame {{ frame.frame_number }}"
+                                                 style="height: 150px; object-fit: cover;">
+                                            
+                                            {% if frame.is_annotated %}
+                                            <span class="position-absolute top-0 start-0 m-2">
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i>
+                                                </span>
                                             </span>
-                                        </span>
-                                        {% endif %}
+                                            {% endif %}
+                                            
+                                            <div class="position-absolute top-0 end-0 m-2">
+                                                <span class="badge bg-dark bg-opacity-75">
+                                                    {{ frame.annotations|length }}
+                                                </span>
+                                            </div>
+                                        </div>
                                         
-                                        <div class="position-absolute top-0 end-0 m-2">
-                                            <span class="badge bg-dark bg-opacity-75">
-                                                {{ image.annotations|length }}
-                                            </span>
+                                        <div class="card-body p-2">
+                                            <h6 class="card-title small mb-1">
+                                                Frame {{ frame.frame_number }}
+                                            </h6>
+                                            <div class="text-muted small">
+                                                {{ "%.2f"|format(frame.timestamp) }}s • {{ frame.width }}×{{ frame.height }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="card-footer p-2">
+                                            <a href="{{ url_for('annotate_video_frame', frame_id=frame.id) }}" 
+                                               class="btn btn-sm btn-primary w-100">
+                                                <i class="fas fa-edit me-1"></i>Annotate
+                                            </a>
                                         </div>
                                     </div>
-                                    
-                                    <div class="card-body p-2">
-                                        <h6 class="card-title small mb-1" title="{{ image.original_filename }}">
-                                            {{ image.original_filename[:20] }}{% if image.original_filename|length > 20 %}...{% endif %}
-                                        </h6>
-                                        <div class="text-muted small">
-                                            {{ image.width }}×{{ image.height }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-video fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No frames extracted yet</p>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        {% if images %}
+                            <div class="row g-3">
+                                {% for image in images %}
+                                <div class="col-md-4 col-sm-6">
+                                    <div class="card image-card">
+                                        <div class="position-relative">
+                                            <img src="{{ url_for('serve_image', project_id=project.id, image_id=image.id) }}" 
+                                                 class="card-img-top" alt="{{ image.original_filename }}"
+                                                 style="height: 150px; object-fit: cover;">
+                                            
+                                            {% if image.is_annotated %}
+                                            <span class="position-absolute top-0 start-0 m-2">
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i>
+                                                </span>
+                                            </span>
+                                            {% endif %}
+                                            
+                                            <div class="position-absolute top-0 end-0 m-2">
+                                                <span class="badge bg-dark bg-opacity-75">
+                                                    {{ image.annotations|length }}
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    
-                                    <div class="card-footer p-2">
+                                        
+                                        <div class="card-body p-2">
+                                            <h6 class="card-title small mb-1" title="{{ image.original_filename }}">
+                                                {{ image.original_filename[:20] }}{% if image.original_filename|length > 20 %}...{% endif %}
+                                            </h6>
+                                            <div class="text-muted small">
+                                                {{ image.width }}×{{ image.height }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="card-footer p-2">
                                         <a href="{{ url_for('annotate_image', image_id=image.id) }}" 
                                            class="btn btn-primary btn-sm w-100">
                                             <i class="fas fa-edit me-1"></i>Annotate
