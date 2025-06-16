@@ -8,7 +8,18 @@ class AnnotationTool {
         this.imageUrl = options.imageUrl;
         this.imageWidth = options.imageWidth;
         this.imageHeight = options.imageHeight;
-        this.labels = options.labels || {};
+        
+        // Convert labels array to object if needed
+        this.labels = {};
+        if (options.labels) {
+            if (Array.isArray(options.labels)) {
+                options.labels.forEach(label => {
+                    this.labels[label.id] = label;
+                });
+            } else {
+                this.labels = options.labels;
+            }
+        }
         
         // Canvas and renderer
         this.renderer = null;
@@ -103,8 +114,8 @@ class AnnotationTool {
     onMouseDown(e) {
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX;
-        const y = e.clientY;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
         
         // Check if clicking on an existing annotation
         const clickedAnnotation = this.getAnnotationAt(x, y);
@@ -135,8 +146,8 @@ class AnnotationTool {
     
     onMouseMove(e) {
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX;
-        const y = e.clientY;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
         
         if (this.isDrawing && this.startPoint) {
             // Draw new annotation
@@ -154,10 +165,12 @@ class AnnotationTool {
             
             if (constrainedWidth > 5 && constrainedHeight > 5) {
                 const label = this.labels[this.selectedLabelId];
-                this.drawingBox = new AnnotationBox(
-                    constrainedX, constrainedY, constrainedWidth, constrainedHeight,
-                    this.selectedLabelId, label.color
-                );
+                if (label) {
+                    this.drawingBox = new AnnotationBox(
+                        constrainedX, constrainedY, constrainedWidth, constrainedHeight,
+                        this.selectedLabelId, label.color
+                    );
+                }
             }
             
             this.draw();
@@ -195,10 +208,22 @@ class AnnotationTool {
     }
     
     onMouseUp(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
         if (this.isDrawing && this.drawingBox) {
             // Finish drawing new annotation
             if (this.drawingBox.width > 10 && this.drawingBox.height > 10) {
+                this.drawingBox.saved = false; // Mark as unsaved
                 this.annotations.push(this.drawingBox);
+                
+                // Enable save button
+                const saveBtn = document.getElementById('saveBtn');
+                if (saveBtn) saveBtn.disabled = false;
+                
+                // Update annotation count
+                this.updateAnnotationCount();
             }
             this.drawingBox = null;
             this.isDrawing = false;
@@ -344,6 +369,13 @@ class AnnotationTool {
     
     getAnnotationCount() {
         return this.annotations.length;
+    }
+    
+    updateAnnotationCount() {
+        const countElement = document.getElementById('annotationCount');
+        if (countElement) {
+            countElement.textContent = this.annotations.length;
+        }
     }
     
     getUnsavedAnnotations() {
