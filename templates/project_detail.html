@@ -53,7 +53,7 @@
             <div class="card bg-primary bg-opacity-10 border-primary">
                 <div class="card-body text-center">
                     {% if project.project_type.value == 'video' %}
-                    <h4 class="text-primary">{{ video_frames|length if video_frames else 0 }}</h4>
+                    <h4 class="text-primary">{{ total_frames if total_frames else 0 }}</h4>
                     <small class="text-muted">Total Frames</small>
                     {% else %}
                     <h4 class="text-primary">{{ project.total_images }}</h4>
@@ -66,8 +66,13 @@
         <div class="col-md-3">
             <div class="card bg-success bg-opacity-10 border-success">
                 <div class="card-body text-center">
+                    {% if project.project_type.value == 'video' %}
+                    <h4 class="text-success">{{ annotated_frames if annotated_frames else 0 }}</h4>
+                    <small class="text-muted">Annotated Frames</small>
+                    {% else %}
                     <h4 class="text-success">{{ project.annotated_images }}</h4>
                     <small class="text-muted">Annotated</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -75,8 +80,13 @@
         <div class="col-md-3">
             <div class="card bg-warning bg-opacity-10 border-warning">
                 <div class="card-body text-center">
+                    {% if project.project_type.value == 'video' %}
+                    <h4 class="text-warning">{{ (total_frames - annotated_frames) if (total_frames and annotated_frames) else (total_frames or 0) }}</h4>
+                    <small class="text-muted">Pending Frames</small>
+                    {% else %}
                     <h4 class="text-warning">{{ project.total_images - project.annotated_images }}</h4>
                     <small class="text-muted">Pending</small>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -70,6 +70,60 @@
                             <div class="form-text">Supported formats: MP4, AVI, MOV, MKV (Max: 500MB)</div>
                         </div>
                         
+                        <!-- Video frame extraction options -->
+                        <div id="videoFrameOptions" class="mb-3" style="display: none;">
+                            <label class="form-label">Frame Extraction Method</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card extraction-method-card" data-method="interval">
+                                        <div class="card-body">
+                                            <input type="radio" name="extraction_method" value="interval" id="method_interval" checked class="form-check-input me-2">
+                                            <label for="method_interval" class="form-check-label">
+                                                <strong>Every N Frames</strong><br>
+                                                <small class="text-muted">Extract one frame every N frames</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card extraction-method-card" data-method="fps">
+                                        <div class="card-body">
+                                            <input type="radio" name="extraction_method" value="fps" id="method_fps" class="form-check-input me-2">
+                                            <label for="method_fps" class="form-check-label">
+                                                <strong>Target FPS</strong><br>
+                                                <small class="text-muted">Extract frames at specific FPS rate</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <div id="intervalOptions">
+                                    <label for="frameInterval" class="form-label">Frame Interval</label>
+                                    <select class="form-select" id="frameInterval" name="frame_interval">
+                                        <option value="15">Every 15 frames (faster processing)</option>
+                                        <option value="30" selected>Every 30 frames (balanced)</option>
+                                        <option value="60">Every 60 frames (fewer frames)</option>
+                                        <option value="120">Every 120 frames (minimal frames)</option>
+                                    </select>
+                                    <div class="form-text">Higher intervals = fewer frames extracted</div>
+                                </div>
+                                
+                                <div id="fpsOptions" style="display: none;">
+                                    <label for="targetFps" class="form-label">Target FPS</label>
+                                    <select class="form-select" id="targetFps" name="target_fps">
+                                        <option value="0.5">0.5 FPS (1 frame every 2 seconds)</option>
+                                        <option value="1" selected>1 FPS (1 frame per second)</option>
+                                        <option value="2">2 FPS (2 frames per second)</option>
+                                        <option value="5">5 FPS (5 frames per second)</option>
+                                        <option value="10">10 FPS (10 frames per second)</option>
+                                    </select>
+                                    <div class="form-text">Higher FPS = more frames extracted</div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Batch processing options -->
                         <div id="batchOptions" class="mb-3">
                             <label for="batchSize" class="form-label">Batch Size</label>
@@ -127,8 +181,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     const projectTypeCards = document.querySelectorAll('.project-type-card');
     const videoUploadSection = document.getElementById('videoUploadSection');
+    const videoFrameOptions = document.getElementById('videoFrameOptions');
     const batchOptions = document.getElementById('batchOptions');
     const projectTypeInfo = document.getElementById('projectTypeInfo');
+    const extractionMethodCards = document.querySelectorAll('.extraction-method-card');
+    const intervalOptions = document.getElementById('intervalOptions');
+    const fpsOptions = document.getElementById('fpsOptions');
     
     // Set initial state
     updateSelection('image');
@@ -144,6 +202,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Handle extraction method selection
+    extractionMethodCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const method = this.dataset.method;
+            
+            // Update radio selection
+            document.getElementById('method_' + method).checked = true;
+            
+            // Update extraction method cards
+            extractionMethodCards.forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show/hide appropriate options
+            if (method === 'interval') {
+                intervalOptions.style.display = 'block';
+                fpsOptions.style.display = 'none';
+            } else {
+                intervalOptions.style.display = 'none';
+                fpsOptions.style.display = 'block';
+            }
+        });
+    });
+    
     function updateSelection(type) {
         // Update card styling
         projectTypeCards.forEach(card => {
@@ -156,10 +237,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show/hide relevant sections
         if (type === 'video') {
             videoUploadSection.style.display = 'block';
+            videoFrameOptions.style.display = 'block';
             batchOptions.style.display = 'none';
             projectTypeInfo.textContent = 'Upload a video file and the system will automatically extract frames for annotation. You can navigate frame-by-frame and track objects across time.';
         } else {
             videoUploadSection.style.display = 'none';
+            videoFrameOptions.style.display = 'none';
             batchOptions.style.display = 'block';
             projectTypeInfo.textContent = 'Your project will be created with default labels: person, car, bicycle, dog, cat. You can add more labels after creation. Large datasets are handled with efficient batch processing.';
         }
