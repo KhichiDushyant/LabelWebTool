@@ -136,9 +136,9 @@
                             </div>
                             <p class="mt-3 text-muted">Extracting frames from video...</p>
                         </div>
-                        {% elif video_frames %}
+                        {% elif video_frames and video_frames.items %}
                             <div class="row g-3">
-                                {% for frame in video_frames %}
+                                {% for frame in video_frames.items %}
                                 <div class="col-md-4 col-sm-6">
                                     <div class="card image-card">
                                         <div class="position-relative">
