@@ -246,30 +246,37 @@ class AnnotationTool {
     
     onTouchStart(e) {
         e.preventDefault();
-        if (e.touches.length === 1) {
+        if (e.touches && e.touches.length === 1) {
             const touch = e.touches[0];
-            this.onMouseDown({
+            const mockEvent = {
                 preventDefault: () => {},
                 clientX: touch.clientX,
                 clientY: touch.clientY
-            });
+            };
+            this.onMouseDown(mockEvent);
         }
     }
     
     onTouchMove(e) {
         e.preventDefault();
-        if (e.touches.length === 1) {
+        if (e.touches && e.touches.length === 1) {
             const touch = e.touches[0];
-            this.onMouseMove({
+            const mockEvent = {
                 clientX: touch.clientX,
                 clientY: touch.clientY
-            });
+            };
+            this.onMouseMove(mockEvent);
         }
     }
     
     onTouchEnd(e) {
         e.preventDefault();
-        this.onMouseUp();
+        const mockEvent = {
+            preventDefault: () => {},
+            clientX: 0,
+            clientY: 0
+        };
+        this.onMouseUp(mockEvent);
     }
     
     onWheel(e) {

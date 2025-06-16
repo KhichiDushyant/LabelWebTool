@@ -15,21 +15,33 @@ class CanvasRenderer {
     }
     
     setupCanvas() {
+        // Set canvas size to fill the container
+        const container = this.canvas.parentElement;
+        const containerRect = container.getBoundingClientRect();
+        
+        // Calculate optimal canvas size (minimum 800x600, but scale to fit container)
+        const minWidth = 800;
+        const minHeight = 600;
+        const maxWidth = Math.max(containerRect.width - 20, minWidth);
+        const maxHeight = Math.max(containerRect.height - 20, minHeight);
+        
         // Set up high DPI canvas
         const dpr = window.devicePixelRatio || 1;
-        const rect = this.canvas.getBoundingClientRect();
         
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
+        this.canvas.width = maxWidth * dpr;
+        this.canvas.height = maxHeight * dpr;
         
         this.ctx.scale(dpr, dpr);
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.style.width = maxWidth + 'px';
+        this.canvas.style.height = maxHeight + 'px';
         
         // Handle resize
         window.addEventListener('resize', () => {
             this.setupCanvas();
-            this.draw();
+            if (this.imageLoaded) {
+                this.fitImageToCanvas();
+                this.draw();
+            }
         });
     }
     
@@ -54,7 +66,8 @@ class CanvasRenderer {
         const scaleX = canvasRect.width / this.image.width;
         const scaleY = canvasRect.height / this.image.height;
         
-        this.scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+        // Use a larger scale to fill more of the canvas, allow scaling up to 2x for small images
+        this.scale = Math.min(scaleX, scaleY, 2); 
         
         // Center the image
         this.offsetX = (canvasRect.width - this.image.width * this.scale) / 2;
