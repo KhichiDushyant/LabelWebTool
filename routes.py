@@ -427,6 +427,30 @@ def create_annotation():
         'message': 'Annotation created successfully'
     })
 
+@app.route('/api/video-annotations', methods=['POST'])
+@require_login
+def create_video_annotation():
+    data = request.get_json()
+    
+    frame = VideoFrame.query.get_or_404(data['frame_id'])
+    if not current_user.can_access_project(frame.project):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    annotation = VideoAnnotation(
+        frame_id=data['frame_id'],
+        label_id=data['label_id'],
+        user_id=current_user.id,
+        x=data['x'],
+        y=data['y'],
+        width=data['width'],
+        height=data['height']
+    )
+    
+    db.session.add(annotation)
+    db.session.commit()
+    
+    return jsonify({'id': annotation.id, 'message': 'Video annotation created'}), 201
+
 @app.route('/api/annotations/<int:annotation_id>', methods=['PUT'])
 @require_login
 def update_annotation(annotation_id):
