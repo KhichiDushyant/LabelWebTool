@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Image Annotation Tool{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Admin Panel</h2>
+
+    <!-- Statistics Overview -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 border-primary">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                    <h3 class="card-title">{{ users|length }}</h3>
+                    <p class="card-text">Total Users</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success bg-opacity-10 border-success">
+                <div class="card-body text-center">
+                    <i class="fas fa-folder fa-2x text-success mb-2"></i>
+                    <h3 class="card-title">{{ projects|length }}</h3>
+                    <p class="card-text">Total Projects</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-images fa-2x text-warning mb-2"></i>
+                    <h3 class="card-title">{{ total_images }}</h3>
+                    <p class="card-text">Total Images</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info bg-opacity-10 border-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-tags fa-2x text-info mb-2"></i>
+                    <h3 class="card-title">{{ total_annotations }}</h3>
+                    <p class="card-text">Total Annotations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Users Management -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">User Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Projects</th>
+                                    <th>Annotations</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if user.profile_image_url %}
+                                            <img src="{{ user.profile_image_url }}" alt="Profile" class="rounded-circle me-2" width="32" height="32" style="object-fit: cover;">
+                                            {% else %}
+                                            <i class="fas fa-user-circle fa-2x me-2 text-muted"></i>
+                                            {% endif %}
+                                            <div>
+                                                <div class="fw-semibold">{{ user.display_name }}</div>
+                                                <small class="text-muted">{{ user.id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ user.email or 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'danger' if user.role.value == 'admin' else 'primary' if user.role.value == 'reviewer' else 'secondary' }}">
+                                            {{ user.role.value.title() }}
+                                        </span>
+                                    </td>
+                                    <td>{{ user.projects|length }}</td>
+                                    <td>{{ user.annotations|length }}</td>
+                                    <td>{{ user.created_at.strftime('%b %d, %Y') }}</td>
+                                    <td>
+                                        {% if user.id != current_user.id %}
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                Actions
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <form method="POST" action="{{ url_for('update_user_role', user_id=user.id) }}" class="dropdown-item">
+                                                        <select name="role" class="form-select form-select-sm mb-2" onchange="this.form.submit()">
+                                                            <option value="admin" {% if user.role.value == 'admin' %}selected{% endif %}>Admin</option>
+                                                            <option value="reviewer" {% if user.role.value == 'reviewer' %}selected{% endif %}>Reviewer</option>
+                                                            <option value="annotator" {% if user.role.value == 'annotator' %}selected{% endif %}>Annotator</option>
+                                                        </select>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted small">Current User</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Overview -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Projects</h5>
+                </div>
+                <div class="card-body">
+                    {% for project in projects[:10] %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                <a href="{{ url_for('project_detail', project_id=project.id) }}" class="text-decoration-none">
+                                    {{ project.name }}
+                                </a>
+                            </h6>
+                            <div class="text-muted small">
+                                by {{ project.owner.display_name }} • {{ project.total_images }} images
+                            </div>
+                            <div class="progress mt-1" style="height: 4px;">
+                                <div class="progress-bar" style="width: {{ project.progress_percentage }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if projects|length > 10 %}
+                    <div class="text-center">
+                        <a href="{{ url_for('projects') }}" class="btn btn-sm btn-outline-primary">View All Projects</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- System Info -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">System Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light bg-opacity-10 rounded">
+                                <div class="fw-bold">{{ (users|selectattr('role.value', 'equalto', 'admin')|list)|length }}</div>
+                                <small class="text-muted">Admins</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light bg-opacity-10 rounded">
+                                <div class="fw-bold">{{ (users|selectattr('role.value', 'equalto', 'reviewer')|list)|length }}</div>
+                                <small class="text-muted">Reviewers</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light bg-opacity-10 rounded">
+                                <div class="fw-bold">{{ (users|selectattr('role.value', 'equalto', 'annotator')|list)|length }}</div>
+                                <small class="text-muted">Annotators</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light bg-opacity-10 rounded">
+                                <div class="fw-bold">{{ (projects|selectattr('is_active', 'equalto', true)|list)|length }}</div>
+                                <small class="text-muted">Active Projects</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

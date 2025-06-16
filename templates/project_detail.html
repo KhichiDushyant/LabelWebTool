@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - Image Annotation Tool{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Project Header -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item active">{{ project.name }}</li>
+                </ol>
+            </nav>
+            
+            <h2>{{ project.name }}</h2>
+            <p class="text-muted">{{ project.description or 'No description provided' }}</p>
+        </div>
+        
+        <div class="col-lg-4 text-lg-end">
+            <div class="btn-group mb-2" role="group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download me-2"></i>Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('export_annotations', project_id=project.id, format='pascal_voc') }}">PASCAL VOC</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_annotations', project_id=project.id, format='yolo') }}">YOLO</a></li>
+                </ul>
+            </div>
+            
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="fas fa-upload me-2"></i>Upload Images
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 border-primary">
+                <div class="card-body text-center">
+                    <h4 class="text-primary">{{ project.total_images }}</h4>
+                    <small class="text-muted">Total Images</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success bg-opacity-10 border-success">
+                <div class="card-body text-center">
+                    <h4 class="text-success">{{ project.annotated_images }}</h4>
+                    <small class="text-muted">Annotated</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body text-center">
+                    <h4 class="text-warning">{{ project.total_images - project.annotated_images }}</h4>
+                    <small class="text-muted">Pending</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info bg-opacity-10 border-info">
+                <div class="card-body text-center">
+                    <h4 class="text-info">{{ labels|length }}</h4>
+                    <small class="text-muted">Labels</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Project Progress</h6>
+                <span class="text-muted">{{ project.progress_percentage }}%</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ project.progress_percentage }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Images Grid -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Images</h5>
+                    <small class="text-muted">{{ images|length }} total</small>
+                </div>
+                <div class="card-body">
+                    {% if images %}
+                        <div class="row g-3">
+                            {% for image in images %}
+                            <div class="col-md-4 col-sm-6">
+                                <div class="card image-card">
+                                    <div class="position-relative">
+                                        <img src="{{ url_for('serve_image', project_id=project.id, image_id=image.id) }}" 
+                                             class="card-img-top" alt="{{ image.original_filename }}"
+                                             style="height: 150px; object-fit: cover;">
+                                        
+                                        {% if image.is_annotated %}
+                                        <span class="position-absolute top-0 start-0 m-2">
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i>
+                                            </span>
+                                        </span>
+                                        {% endif %}
+                                        
+                                        <div class="position-absolute top-0 end-0 m-2">
+                                            <span class="badge bg-dark bg-opacity-75">
+                                                {{ image.annotations|length }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title small mb-1" title="{{ image.original_filename }}">
+                                            {{ image.original_filename[:20] }}{% if image.original_filename|length > 20 %}...{% endif %}
+                                        </h6>
+                                        <div class="text-muted small">
+                                            {{ image.width }}×{{ image.height }}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="card-footer p-2">
+                                        <a href="{{ url_for('annotate_image', image_id=image.id) }}" 
+                                           class="btn btn-primary btn-sm w-100">
+                                            <i class="fas fa-edit me-1"></i>Annotate
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No images uploaded</h5>
+                            <p class="text-muted">Upload images to start annotating</p>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                                <i class="fas fa-upload me-2"></i>Upload Images
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Labels Sidebar -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Labels</h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#labelModal">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if labels %}
+                        {% for label in labels %}
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="me-2" style="width: 16px; height: 16px; background-color: {{ label.color }}; border-radius: 2px;"></div>
+                            <span class="flex-grow-1">{{ label.name }}</span>
+                            <small class="text-muted">{{ label.annotations|length }}</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-tags fa-2x text-muted mb-2"></i>
+                            <p class="text-muted small">No labels created</p>
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#labelModal">
+                                <i class="fas fa-plus me-1"></i>Add Label
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Images</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="imageFiles" class="form-label">Select Images</label>
+                        <input type="file" class="form-control" id="imageFiles" name="files" multiple accept="image/*" required>
+                        <div class="form-text">Supported formats: PNG, JPG, JPEG, GIF, BMP, TIFF, WebP</div>
+                    </div>
+                    
+                    <div id="filePreview" class="row g-2 mb-3" style="display: none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="uploadBtn">
+                    <i class="fas fa-upload me-2"></i>Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Label Modal -->
+<div class="modal fade" id="labelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Label</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="labelForm">
+                    <div class="mb-3">
+                        <label for="labelName" class="form-label">Label Name</label>
+                        <input type="text" class="form-control" id="labelName" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="labelColor" class="form-label">Color</label>
+                        <input type="color" class="form-control form-control-color" id="labelColor" value="#FF6B6B">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createLabelBtn">
+                    <i class="fas fa-plus me-2"></i>Create Label
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// File upload preview
+document.getElementById('imageFiles').addEventListener('change', function(e) {
+    const preview = document.getElementById('filePreview');
+    preview.innerHTML = '';
+    
+    if (e.target.files.length > 0) {
+        preview.style.display = 'block';
+        
+        Array.from(e.target.files).slice(0, 6).forEach(file => {
+            const col = document.createElement('div');
+            col.className = 'col-4';
+            
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.className = 'img-fluid rounded';
+            img.style.height = '60px';
+            img.style.objectFit = 'cover';
+            img.onload = () => URL.revokeObjectURL(img.src);
+            
+            col.appendChild(img);
+            preview.appendChild(col);
+        });
+        
+        if (e.target.files.length > 6) {
+            const more = document.createElement('div');
+            more.className = 'col-12 text-center text-muted small';
+            more.textContent = `+${e.target.files.length - 6} more files`;
+            preview.appendChild(more);
+        }
+    } else {
+        preview.style.display = 'none';
+    }
+});
+
+// Upload images
+document.getElementById('uploadBtn').addEventListener('click', function() {
+    const formData = new FormData();
+    const files = document.getElementById('imageFiles').files;
+    
+    if (files.length === 0) {
+        alert('Please select at least one image');
+        return;
+    }
+    
+    Array.from(files).forEach(file => {
+        formData.append('files', file);
+    });
+    
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
+    btn.disabled = true;
+    
+    fetch(`/projects/{{ project.id }}/upload`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Upload failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Upload failed');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+
+// Create label
+document.getElementById('createLabelBtn').addEventListener('click', function() {
+    const name = document.getElementById('labelName').value.trim();
+    const color = document.getElementById('labelColor').value;
+    
+    if (!name) {
+        alert('Please enter a label name');
+        return;
+    }
+    
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating...';
+    btn.disabled = true;
+    
+    fetch(`/projects/{{ project.id }}/labels`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, color })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.id) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to create label');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create label');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Image Annotation Tool{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 d-flex align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 text-center">
+                <div class="mb-5">
+                    <i class="fas fa-image display-1 text-primary mb-4"></i>
+                    <h1 class="display-4 fw-bold mb-4">Image Annotation Tool</h1>
+                    <p class="lead mb-5">
+                        Professional web-based image annotation platform for creating high-quality training datasets. 
+                        Annotate images with bounding boxes, manage projects, and export in popular formats.
+                    </p>
+                </div>
+
+                <div class="row g-4 mb-5">
+                    <div class="col-md-4">
+                        <div class="feature-card h-100 p-4">
+                            <i class="fas fa-mouse-pointer fa-2x text-info mb-3"></i>
+                            <h5>Interactive Annotation</h5>
+                            <p class="text-muted small">Draw precise bounding boxes with an intuitive canvas-based interface</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100 p-4">
+                            <i class="fas fa-users fa-2x text-success mb-3"></i>
+                            <h5>Team Collaboration</h5>
+                            <p class="text-muted small">Work together with role-based access and project management</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="feature-card h-100 p-4">
+                            <i class="fas fa-download fa-2x text-warning mb-3"></i>
+                            <h5>Multiple Export Formats</h5>
+                            <p class="text-muted small">Export annotations in PASCAL VOC, YOLO, and other popular formats</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-block">
+                    <a href="{{ url_for('replit_auth.login') }}" class="btn btn-primary btn-lg px-5">
+                        <i class="fas fa-sign-in-alt me-2"></i>Get Started
+                    </a>
+                </div>
+
+                <div class="mt-4">
+                    <small class="text-muted">
+                        Sign in to start annotating images and managing your projects
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

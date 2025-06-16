@@ -1,0 +1,220 @@
+/* Custom styles for the annotation tool */
+
+:root {
+    --annotation-primary: #007bff;
+    --annotation-success: #28a745;
+    --annotation-danger: #dc3545;
+    --annotation-warning: #ffc107;
+    --annotation-info: #17a2b8;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Feature cards on landing page */
+.feature-card {
+    background: var(--bs-gray-900);
+    border: 1px solid var(--bs-gray-700);
+    border-radius: 0.5rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Image cards in project detail */
+.image-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--bs-gray-700);
+}
+
+.image-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Canvas container styling */
+.canvas-container {
+    background: #1a1a1a;
+    background-image: 
+        linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
+        linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
+        linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+/* Annotation canvas */
+#annotationCanvas {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+}
+
+/* Label and annotation items */
+.label-item, .annotation-item {
+    border: 1px solid var(--bs-gray-700);
+    background: var(--bs-gray-800);
+}
+
+.label-item.active {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary);
+    box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.25);
+}
+
+.annotation-item.selected {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary);
+}
+
+/* Progress bars */
+.progress {
+    background-color: var(--bs-gray-700);
+}
+
+.progress-bar {
+    background: linear-gradient(45deg, var(--bs-primary), var(--bs-info));
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(45deg, var(--bs-primary), #0056b3);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, #0056b3, var(--bs-primary));
+    transform: translateY(-1px);
+}
+
+/* Cards */
+.card {
+    border: 1px solid var(--bs-gray-700);
+    background: var(--bs-gray-900);
+}
+
+.card-header {
+    background: var(--bs-gray-800);
+    border-bottom: 1px solid var(--bs-gray-700);
+}
+
+/* Navbar */
+.navbar-dark {
+    background: var(--bs-gray-900) !important;
+    border-bottom: 1px solid var(--bs-gray-700);
+}
+
+/* Tables */
+.table-dark {
+    --bs-table-bg: var(--bs-gray-900);
+    --bs-table-border-color: var(--bs-gray-700);
+}
+
+/* Modals */
+.modal-content {
+    background: var(--bs-gray-900);
+    border: 1px solid var(--bs-gray-700);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--bs-gray-700);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--bs-gray-700);
+}
+
+/* Form controls */
+.form-control, .form-select {
+    background: var(--bs-gray-800);
+    border: 1px solid var(--bs-gray-600);
+    color: var(--bs-light);
+}
+
+.form-control:focus, .form-select:focus {
+    background: var(--bs-gray-800);
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+    color: var(--bs-light);
+}
+
+/* Alerts */
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+/* Badges */
+.badge {
+    font-weight: 500;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+    background: var(--bs-gray-800);
+    border: 1px solid var(--bs-gray-700);
+}
+
+.dropdown-item {
+    color: var(--bs-light);
+}
+
+.dropdown-item:hover {
+    background: var(--bs-gray-700);
+    color: var(--bs-light);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .annotation-container {
+        height: auto;
+    }
+    
+    .tools-panel {
+        height: auto;
+        margin-top: 1rem;
+    }
+    
+    .canvas-container {
+        height: 400px;
+    }
+}
+
+/* Loading states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Zoom controls */
+.btn-group .btn {
+    border-color: var(--bs-gray-600);
+}
+
+/* File upload preview */
+.file-preview img {
+    border: 2px solid var(--bs-gray-600);
+    border-radius: 0.25rem;
+}
+
+/* Annotation list scrollbar */
+.tools-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tools-panel::-webkit-scrollbar-track {
+    background: var(--bs-gray-800);
+}
+
+.tools-panel::-webkit-scrollbar-thumb {
+    background: var(--bs-gray-600);
+    border-radius: 3px;
+}
+
+.tools-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-gray-500);
+}

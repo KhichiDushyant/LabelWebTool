@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Image Annotation Tool{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Welcome back, {{ current_user.display_name }}!</h2>
+                <a href="{{ url_for('new_project') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>New Project
+                </a>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary bg-opacity-10 border-primary">
+                        <div class="card-body text-center">
+                            <i class="fas fa-folder fa-2x text-primary mb-2"></i>
+                            <h3 class="card-title">{{ projects|length }}</h3>
+                            <p class="card-text">Active Projects</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card bg-success bg-opacity-10 border-success">
+                        <div class="card-body text-center">
+                            <i class="fas fa-tag fa-2x text-success mb-2"></i>
+                            <h3 class="card-title">{{ total_annotations }}</h3>
+                            <p class="card-text">Total Annotations</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card bg-info bg-opacity-10 border-info">
+                        <div class="card-body text-center">
+                            <i class="fas fa-images fa-2x text-info mb-2"></i>
+                            <h3 class="card-title">{{ total_images_annotated }}</h3>
+                            <p class="card-text">Images Annotated</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Projects -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Your Projects</h5>
+                    <a href="{{ url_for('projects') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if projects %}
+                        <div class="row g-3">
+                            {% for project in projects[:6] %}
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            <a href="{{ url_for('project_detail', project_id=project.id) }}" class="text-decoration-none">
+                                                {{ project.name }}
+                                            </a>
+                                        </h6>
+                                        <p class="card-text small text-muted mb-2">{{ project.description or 'No description' }}</p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small class="text-muted">
+                                                {{ project.total_images }} images
+                                            </small>
+                                            <div class="progress" style="width: 60px; height: 6px;">
+                                                <div class="progress-bar" style="width: {{ project.progress_percentage }}%"></div>
+                                            </div>
+                                            <small class="text-muted">{{ project.progress_percentage }}%</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No projects yet</h5>
+                            <p class="text-muted">Create your first project to start annotating images</p>
+                            <a href="{{ url_for('new_project') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Create Project
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_annotations %}
+                        {% for annotation in recent_annotations %}
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="fas fa-tag text-primary"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="small">
+                                    Annotated <strong>{{ annotation.label.name }}</strong>
+                                </div>
+                                <div class="text-muted small">
+                                    {{ annotation.image.original_filename }} • {{ annotation.created_at.strftime('%b %d, %Y') }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                            <p class="text-muted small">No recent activity</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('new_project') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-plus me-2"></i>New Project
+                        </a>
+                        <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-folder me-2"></i>Browse Projects
+                        </a>
+                        {% if current_user.role.value == 'admin' %}
+                        <a href="{{ url_for('admin_panel') }}" class="btn btn-outline-warning btn-sm">
+                            <i class="fas fa-cogs me-2"></i>Admin Panel
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

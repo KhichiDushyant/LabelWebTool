@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}Annotate {{ image.original_filename }} - Image Annotation Tool{% endblock %}
+
+{% block head %}
+<style>
+    .annotation-container {
+        height: calc(100vh - 120px);
+        overflow: hidden;
+    }
+    
+    .canvas-container {
+        position: relative;
+        height: 100%;
+        overflow: auto;
+        background: #1a1a1a;
+        border-radius: 0.375rem;
+    }
+    
+    #annotationCanvas {
+        cursor: crosshair;
+        display: block;
+        margin: auto;
+    }
+    
+    .tools-panel {
+        height: calc(100vh - 120px);
+        overflow-y: auto;
+    }
+    
+    .label-item {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .label-item:hover {
+        background-color: var(--bs-gray-800);
+    }
+    
+    .label-item.active {
+        background-color: var(--bs-primary);
+        color: white;
+    }
+    
+    .annotation-item {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .annotation-item:hover {
+        background-color: var(--bs-gray-800);
+    }
+    
+    .annotation-item.selected {
+        background-color: var(--bs-primary);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <!-- Navigation -->
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('project_detail', project_id=image.project.id) }}">{{ image.project.name }}</a></li>
+                    <li class="breadcrumb-item active">{{ image.original_filename }}</li>
+                </ol>
+            </nav>
+        </div>
+        
+        <div class="col-auto">
+            <div class="btn-group" role="group">
+                {% if prev_image %}
+                <a href="{{ url_for('annotate_image', image_id=prev_image.id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+                {% endif %}
+                
+                {% if next_image %}
+                <a href="{{ url_for('annotate_image', image_id=next_image.id) }}" class="btn btn-outline-secondary">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row annotation-container">
+        <!-- Canvas Area -->
+        <div class="col-lg-9">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">{{ image.original_filename }}</h6>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" id="zoomInBtn">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="zoomOutBtn">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="resetZoomBtn">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="canvas-container">
+                        <canvas id="annotationCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <small class="text-muted">
+                                {{ image.width }}×{{ image.height }} • {{ (image.file_size / 1024 / 1024)|round(1) }} MB
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-danger" id="deleteBtn" disabled>
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                                <button type="button" class="btn btn-outline-success" id="saveBtn">
+                                    <i class="fas fa-save"></i> Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tools Panel -->
+        <div class="col-lg-3">
+            <div class="tools-panel">
+                <!-- Labels -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">Labels</h6>
+                    </div>
+                    <div class="card-body p-2">
+                        {% for label in labels %}
+                        <div class="label-item p-2 rounded mb-1" data-label-id="{{ label.id }}" data-label-color="{{ label.color }}">
+                            <div class="d-flex align-items-center">
+                                <div class="me-2" style="width: 12px; height: 12px; background-color: {{ label.color }}; border-radius: 2px;"></div>
+                                <span class="flex-grow-1">{{ label.name }}</span>
+                                <kbd class="small">{{ loop.index }}</kbd>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Current Annotations -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Annotations</h6>
+                        <span class="badge bg-secondary" id="annotationCount">{{ annotations|length }}</span>
+                    </div>
+                    <div class="card-body p-2" id="annotationsList">
+                        {% for annotation in annotations %}
+                        <div class="annotation-item p-2 rounded mb-1" data-annotation-id="{{ annotation.id }}">
+                            <div class="d-flex align-items-center">
+                                <div class="me-2" style="width: 12px; height: 12px; background-color: {{ annotation.label.color }}; border-radius: 2px;"></div>
+                                <span class="flex-grow-1">{{ annotation.label.name }}</span>
+                                <button class="btn btn-sm btn-outline-danger delete-annotation" data-annotation-id="{{ annotation.id }}">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                ({{ annotation.x|int }}, {{ annotation.y|int }}) {{ annotation.width|int }}×{{ annotation.height|int }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Keyboard Shortcuts -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">Shortcuts</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="small">
+                            <div class="mb-1"><kbd>1-9</kbd> Select label</div>
+                            <div class="mb-1"><kbd>Del</kbd> Delete selected</div>
+                            <div class="mb-1"><kbd>Ctrl+S</kbd> Save</div>
+                            <div class="mb-1"><kbd>Esc</kbd> Cancel drawing</div>
+                            <div class="mb-1"><kbd>+/-</kbd> Zoom in/out</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/annotation.js') }}"></script>
+<script>
+// Initialize annotation tool
+const annotationTool = new AnnotationTool({
+    canvasId: 'annotationCanvas',
+    imageUrl: '{{ url_for("serve_image", project_id=image.project.id, image_id=image.id) }}',
+    imageWidth: {{ image.width }},
+    imageHeight: {{ image.height }},
+    annotations: {{ annotations|map(attribute='bbox_dict')|list|tojson }},
+    annotationIds: {{ annotations|map(attribute='id')|list|tojson }},
+    annotationLabels: {{ annotations|map(attribute='label_id')|list|tojson }},
+    labels: {
+        {% for label in labels %}
+        {{ label.id }}: {
+            name: '{{ label.name }}',
+            color: '{{ label.color }}'
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    }
+});
+
+// Label selection
+document.querySelectorAll('.label-item').forEach((item, index) => {
+    item.addEventListener('click', function() {
+        document.querySelectorAll('.label-item').forEach(i => i.classList.remove('active'));
+        this.classList.add('active');
+        annotationTool.setSelectedLabel(parseInt(this.dataset.labelId));
+    });
+    
+    // Keyboard shortcuts for labels (1-9)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === (index + 1).toString() && !e.ctrlKey && !e.altKey) {
+            item.click();
+        }
+    });
+});
+
+// Select first label by default
+if (document.querySelector('.label-item')) {
+    document.querySelector('.label-item').click();
+}
+
+// Annotation selection
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.annotation-item')) {
+        const item = e.target.closest('.annotation-item');
+        document.querySelectorAll('.annotation-item').forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        
+        const annotationId = parseInt(item.dataset.annotationId);
+        annotationTool.selectAnnotation(annotationId);
+    }
+});
+
+// Delete annotation
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.delete-annotation')) {
+        e.stopPropagation();
+        const annotationId = parseInt(e.target.closest('.delete-annotation').dataset.annotationId);
+        
+        if (confirm('Delete this annotation?')) {
+            fetch(`/api/annotations/${annotationId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    annotationTool.removeAnnotation(annotationId);
+                    updateAnnotationsList();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    }
+});
+
+// Zoom controls
+document.getElementById('zoomInBtn').addEventListener('click', () => annotationTool.zoomIn());
+document.getElementById('zoomOutBtn').addEventListener('click', () => annotationTool.zoomOut());
+document.getElementById('resetZoomBtn').addEventListener('click', () => annotationTool.resetZoom());
+
+// Save button
+document.getElementById('saveBtn').addEventListener('click', function() {
+    const unsavedAnnotations = annotationTool.getUnsavedAnnotations();
+    
+    if (unsavedAnnotations.length === 0) {
+        alert('No changes to save');
+        return;
+    }
+    
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+    btn.disabled = true;
+    
+    Promise.all(unsavedAnnotations.map(annotation => {
+        return fetch('/api/annotations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image_id: {{ image.id }},
+                label_id: annotation.labelId,
+                x: annotation.x,
+                y: annotation.y,
+                width: annotation.width,
+                height: annotation.height
+            })
+        }).then(response => response.json());
+    }))
+    .then(results => {
+        annotationTool.markAnnotationsSaved();
+        updateAnnotationsList();
+        alert('Annotations saved successfully!');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to save annotations');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selected = annotationTool.getSelectedAnnotation();
+        if (selected && confirm('Delete selected annotation?')) {
+            annotationTool.deleteSelectedAnnotation();
+            updateAnnotationsList();
+        }
+    } else if (e.key === 'Escape') {
+        annotationTool.cancelDrawing();
+    } else if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        document.getElementById('saveBtn').click();
+    } else if (e.key === '+' || e.key === '=') {
+        annotationTool.zoomIn();
+    } else if (e.key === '-') {
+        annotationTool.zoomOut();
+    }
+});
+
+// Update annotations list
+function updateAnnotationsList() {
+    const count = annotationTool.getAnnotationCount();
+    document.getElementById('annotationCount').textContent = count;
+    
+    // Refresh the page to update the annotations list
+    // In a real application, you might want to update this dynamically
+    setTimeout(() => location.reload(), 1000);
+}
+
+// Initialize canvas
+annotationTool.init();
+</script>
+{% endblock %}
