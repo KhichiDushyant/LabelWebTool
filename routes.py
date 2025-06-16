@@ -387,7 +387,7 @@ def annotate_video_frame(frame_id):
 def create_annotation():
     data = request.get_json()
     
-    # Handle both image and video frame annotations
+    # Handle image annotations
     if 'image_id' in data:
         image = Image.query.get_or_404(data['image_id'])
         if not current_user.can_access_project(image.project):

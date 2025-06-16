@@ -190,9 +190,14 @@
 // Initialize annotation tool for video frames
 document.addEventListener('DOMContentLoaded', function() {
     const canvas = document.getElementById('annotationCanvas');
-    const frameId = canvas.dataset.frameId;
-    const frameWidth = parseInt(canvas.dataset.frameWidth);
-    const frameHeight = parseInt(canvas.dataset.frameHeight);
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+    
+    const frameId = {{ frame.id }};
+    const frameWidth = {{ frame.width }};
+    const frameHeight = {{ frame.height }};
     
     // Load frame image
     const frameUrl = `/projects/{{ frame.project_id }}/frames/{{ frame.id }}`;
@@ -234,6 +239,80 @@ document.addEventListener('DOMContentLoaded', function() {
         labelIds: [{% for annotation in annotations %}{{ annotation.label_id }}{% if not loop.last %},{% endif %}{% endfor %}],
         isVideoFrame: true,
         frameId: frameId
+    });
+
+    // Initialize the annotation tool
+    annotationTool.init().then(() => {
+        console.log('Video frame annotation tool initialized successfully');
+    }).catch(error => {
+        console.error('Failed to initialize annotation tool:', error);
+    });
+
+    // Label selection
+    document.querySelectorAll('.label-item').forEach((item, index) => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.label-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            annotationTool.setSelectedLabel(parseInt(this.dataset.labelId));
+        });
+    });
+
+    // Select first label by default
+    if (document.querySelector('.label-item')) {
+        document.querySelector('.label-item').click();
+    }
+
+    // Zoom controls
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    
+    if (zoomInBtn) zoomInBtn.addEventListener('click', () => annotationTool.zoomIn());
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => annotationTool.zoomOut());
+    if (resetZoomBtn) resetZoomBtn.addEventListener('click', () => annotationTool.resetZoom());
+
+    // Save functionality
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', function() {
+        const unsavedAnnotations = annotationTool.getUnsavedAnnotations();
+        
+        if (unsavedAnnotations.length === 0) {
+            alert('No changes to save');
+            return;
+        }
+        
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+        btn.disabled = true;
+        
+        Promise.all(unsavedAnnotations.map(annotation => {
+            return fetch('/api/video-annotations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    frame_id: frameId,
+                    label_id: annotation.labelId,
+                    x: annotation.x,
+                    y: annotation.y,
+                    width: annotation.width,
+                    height: annotation.height
+                })
+            }).then(response => response.json());
+        }))
+        .then(results => {
+            annotationTool.markAnnotationsSaved();
+            alert('Annotations saved successfully!');
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to save annotations');
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
     });
     
     // Keyboard navigation

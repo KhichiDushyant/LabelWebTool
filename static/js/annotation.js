@@ -4,13 +4,13 @@
 class AnnotationTool {
     constructor(options) {
         this.canvasId = options.canvasId;
+        this.canvas = options.canvas;
         this.imageUrl = options.imageUrl;
         this.imageWidth = options.imageWidth;
         this.imageHeight = options.imageHeight;
         this.labels = options.labels || {};
         
         // Canvas and renderer
-        this.canvas = null;
         this.renderer = null;
         
         // Annotation management
@@ -40,9 +40,19 @@ class AnnotationTool {
     }
     
     init() {
-        this.canvas = document.getElementById(this.canvasId);
-        if (!this.canvas) {
-            console.error('Canvas element not found:', this.canvasId);
+        // Handle both canvas element and canvas ID
+        if (this.canvas) {
+            // Canvas element was passed directly
+            console.log('Using provided canvas element');
+        } else if (this.canvasId) {
+            // Canvas ID was provided, find the element
+            this.canvas = document.getElementById(this.canvasId);
+            if (!this.canvas) {
+                console.error('Canvas element not found:', this.canvasId);
+                return;
+            }
+        } else {
+            console.error('No canvas element or canvas ID provided');
             return;
         }
         
