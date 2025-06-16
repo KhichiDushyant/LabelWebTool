@@ -92,6 +92,8 @@ def new_project():
         # Handle video upload if it's a video project
         if project_type == ProjectType.VIDEO and 'video_file' in request.files:
             video_file = request.files['video_file']
+            frame_interval = int(request.form.get('frame_interval', 30))  # Extract every N frames
+            
             if video_file.filename != '':
                 app.config['CURRENT_USER_ID'] = current_user.id
                 video_info = save_uploaded_video(video_file, project.id)
@@ -105,12 +107,12 @@ def new_project():
                     project.processing_status = 'processing'
                     db.session.commit()
                     
-                    # Extract frames in background (simplified for demo)
+                    # Extract frames with custom interval
                     try:
-                        extract_video_frames(video_info['filepath'], project.id)
+                        extracted_frames = extract_video_frames(video_info['filepath'], project.id, frame_interval)
                         project.processing_status = 'completed'
                         db.session.commit()
-                        flash('Video uploaded and frames extracted successfully!', 'success')
+                        flash(f'Video uploaded! Extracted {len(extracted_frames)} frames for annotation.', 'success')
                     except Exception as e:
                         project.processing_status = 'failed'
                         db.session.commit()
@@ -193,7 +195,9 @@ def upload_images(project_id):
                 'success': True,
                 'uploaded_count': len(processed_images),
                 'message': f'{len(processed_images)} images processed in batches',
-                'batch_processed': True
+                'batch_processed': True,
+                'total_files': len(files),
+                'processing_status': 'completed'
             })
         except Exception as e:
             project.processing_status = 'failed'
@@ -227,8 +231,81 @@ def upload_images(project_id):
         return jsonify({
             'success': True,
             'uploaded_count': uploaded_count,
-            'message': f'{uploaded_count} images uploaded successfully'
+            'message': f'{uploaded_count} images uploaded successfully',
+            'batch_processed': False,
+            'total_files': len(files),
+            'processing_status': 'completed'
         })
+
+@app.route('/projects/<int:project_id>/status')
+@require_login
+def project_status(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    if not current_user.can_access_project(project):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    if project.project_type == ProjectType.VIDEO:
+        total_frames = VideoFrame.query.filter_by(project_id=project_id).count()
+        return jsonify({
+            'processing_status': project.processing_status,
+            'project_type': project.project_type.value,
+            'total_frames': total_frames,
+            'video_duration': project.video_duration,
+            'video_fps': project.video_fps
+        })
+    else:
+        total_images = Image.query.filter_by(project_id=project_id).count()
+        annotated_images = len(set([ann.image_id for ann in 
+                                  Annotation.query.join(Image).filter(Image.project_id == project_id).all()]))
+        return jsonify({
+            'processing_status': project.processing_status,
+            'project_type': project.project_type.value,
+            'total_images': total_images,
+            'annotated_images': annotated_images,
+            'progress_percentage': (annotated_images / total_images * 100) if total_images > 0 else 0
+        })
+
+@app.route('/projects/<int:project_id>/reextract-frames', methods=['POST'])
+@require_login
+def reextract_video_frames(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    if not current_user.can_access_project(project):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    if project.project_type != ProjectType.VIDEO:
+        return jsonify({'error': 'Only video projects support frame extraction'}), 400
+    
+    if not project.video_filepath:
+        return jsonify({'error': 'No video file found'}), 400
+    
+    data = request.get_json()
+    frame_interval = int(data.get('frame_interval', 30))
+    
+    try:
+        # Delete existing frames
+        VideoFrame.query.filter_by(project_id=project_id).delete()
+        db.session.commit()
+        
+        # Extract new frames
+        project.processing_status = 'processing'
+        db.session.commit()
+        
+        extracted_frames = extract_video_frames(project.video_filepath, project_id, frame_interval)
+        
+        project.processing_status = 'completed'
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Re-extracted {len(extracted_frames)} frames with interval {frame_interval}',
+            'total_frames': len(extracted_frames)
+        })
+    except Exception as e:
+        project.processing_status = 'failed'
+        db.session.commit()
+        return jsonify({'error': f'Frame extraction failed: {str(e)}'}), 500
 
 @app.route('/projects/<int:project_id>/images/<int:image_id>')
 @require_login
@@ -381,12 +458,22 @@ def update_annotation(annotation_id):
 @app.route('/api/annotations/<int:annotation_id>', methods=['DELETE'])
 @require_login
 def delete_annotation(annotation_id):
-    annotation = Annotation.query.get_or_404(annotation_id)
+    # Try both image and video annotations
+    annotation = Annotation.query.filter_by(id=annotation_id).first()
+    video_annotation = VideoAnnotation.query.filter_by(id=annotation_id).first()
     
-    if not current_user.can_access_project(annotation.image.project):
-        return jsonify({'error': 'Access denied'}), 403
+    if annotation:
+        if not current_user.can_access_project(annotation.image.project):
+            return jsonify({'error': 'Access denied'}), 403
+        target_annotation = annotation
+    elif video_annotation:
+        if not current_user.can_access_project(video_annotation.frame.project):
+            return jsonify({'error': 'Access denied'}), 403
+        target_annotation = video_annotation
+    else:
+        return jsonify({'error': 'Annotation not found'}), 404
     
-    db.session.delete(annotation)
+    db.session.delete(target_annotation)
     db.session.commit()
     
     return jsonify({'message': 'Annotation deleted successfully'})

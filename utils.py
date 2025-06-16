@@ -207,11 +207,14 @@ def extract_video_frames(video_path, project_id, frame_interval=30):
     return extracted_frames
 
 def batch_process_images(image_files, project_id, batch_size=50):
-    """Process images in batches for large datasets"""
+    """Process images in batches for large datasets with progress tracking"""
     from models import Image as ImageModel, db
     
     processed_images = []
     batch_count = 0
+    total_files = len(image_files)
+    
+    current_app.logger.info(f"Starting batch processing of {total_files} images")
     
     for i in range(0, len(image_files), batch_size):
         batch = image_files[i:i + batch_size]
@@ -219,31 +222,38 @@ def batch_process_images(image_files, project_id, batch_size=50):
         
         for file in batch:
             if file.filename != '':
-                image_info = save_uploaded_image(file, project_id)
-                if image_info:
-                    image = ImageModel(
-                        filename=image_info['filename'],
-                        original_filename=image_info['original_filename'],
-                        filepath=image_info['filepath'],
-                        width=image_info['width'],
-                        height=image_info['height'],
-                        file_size=image_info['file_size'],
-                        project_id=project_id,
-                        uploaded_by=current_app.config.get('CURRENT_USER_ID')
-                    )
-                    batch_images.append(image)
+                try:
+                    image_info = save_uploaded_image(file, project_id)
+                    if image_info:
+                        image = ImageModel(
+                            filename=image_info['filename'],
+                            original_filename=image_info['original_filename'],
+                            filepath=image_info['filepath'],
+                            width=image_info['width'],
+                            height=image_info['height'],
+                            file_size=image_info['file_size'],
+                            project_id=project_id,
+                            uploaded_by=current_app.config.get('CURRENT_USER_ID')
+                        )
+                        batch_images.append(image)
+                except Exception as e:
+                    current_app.logger.error(f"Error processing file {file.filename}: {str(e)}")
+                    continue
         
         # Add batch to database
-        db.session.add_all(batch_images)
-        db.session.commit()
+        if batch_images:
+            db.session.add_all(batch_images)
+            db.session.commit()
+            processed_images.extend(batch_images)
         
-        processed_images.extend(batch_images)
         batch_count += 1
+        progress = (len(processed_images) / total_files) * 100
         
-        # Update processing status
-        if batch_count % 5 == 0:  # Update every 5 batches
-            current_app.logger.info(f"Processed {len(processed_images)} images in {batch_count} batches")
+        # Log progress regularly
+        if batch_count % 5 == 0 or len(processed_images) == total_files:
+            current_app.logger.info(f"Batch {batch_count}: Processed {len(processed_images)}/{total_files} images ({progress:.1f}%)")
     
+    current_app.logger.info(f"Batch processing completed: {len(processed_images)} images processed successfully")
     return processed_images
 
 def get_default_label_colors():
