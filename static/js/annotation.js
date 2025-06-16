@@ -53,10 +53,8 @@ class AnnotationTool {
     init() {
         // Handle both canvas element and canvas ID
         if (this.canvas) {
-            // Canvas element was passed directly
             console.log('Using provided canvas element');
         } else if (this.canvasId) {
-            // Canvas ID was provided, find the element
             this.canvas = document.getElementById(this.canvasId);
             if (!this.canvas) {
                 console.error('Canvas element not found:', this.canvasId);
@@ -71,6 +69,7 @@ class AnnotationTool {
         this.setupEventListeners();
         
         return this.renderer.loadImage(this.imageUrl).then(() => {
+            console.log('Image loaded, drawing annotations');
             this.draw();
         });
     }
@@ -95,6 +94,7 @@ class AnnotationTool {
     }
     
     loadExistingAnnotations(annotations, ids, labelIds) {
+        console.log('Loading existing annotations:', annotations);
         for (let i = 0; i < annotations.length; i++) {
             const ann = annotations[i];
             const id = ids[i];
@@ -106,9 +106,14 @@ class AnnotationTool {
                     ann.x, ann.y, ann.width, ann.height,
                     labelId, label.color, id
                 );
+                box.saved = true; // Mark as saved
                 this.annotations.push(box);
+                console.log('Added annotation box:', box);
+            } else {
+                console.warn('Label not found for ID:', labelId);
             }
         }
+        console.log('Total annotations loaded:', this.annotations.length);
     }
     
     onMouseDown(e) {
@@ -332,20 +337,28 @@ class AnnotationTool {
     }
     
     draw() {
-        if (!this.renderer || !this.renderer.imageLoaded) return;
+        if (!this.renderer || !this.renderer.imageLoaded) {
+            console.log('Cannot draw: renderer not ready or image not loaded');
+            return;
+        }
         
         // Draw image first
         this.renderer.draw();
         
         // Draw all annotations
-        this.annotations.forEach(annotation => {
+        console.log('Drawing', this.annotations.length, 'annotations');
+        this.annotations.forEach((annotation, index) => {
             if (annotation.draw) {
+                console.log(`Drawing annotation ${index}:`, annotation);
                 annotation.draw(this.renderer.ctx, this.renderer);
+            } else {
+                console.warn('Annotation missing draw method:', annotation);
             }
         });
         
         // Draw current drawing box
         if (this.drawingBox && this.drawingBox.draw) {
+            console.log('Drawing current box:', this.drawingBox);
             this.drawingBox.draw(this.renderer.ctx, this.renderer);
         }
     }

@@ -169,6 +169,15 @@ class AnnotationBox {
         const screenWidth = this.width * renderer.scale;
         const screenHeight = this.height * renderer.scale;
         
+        console.log(`Drawing annotation at image coords (${this.x}, ${this.y}) -> screen coords (${screenCoords.x}, ${screenCoords.y})`);
+        console.log(`Box dimensions: ${this.width}x${this.height} -> ${screenWidth}x${screenHeight}`);
+        
+        // Ensure we have valid coordinates
+        if (isNaN(screenCoords.x) || isNaN(screenCoords.y) || isNaN(screenWidth) || isNaN(screenHeight)) {
+            console.error('Invalid coordinates for annotation:', this);
+            return;
+        }
+        
         // Draw bounding box
         ctx.strokeStyle = this.color;
         ctx.lineWidth = this.selected ? 3 : 2;
