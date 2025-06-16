@@ -24,8 +24,11 @@
                     <i class="fas fa-download me-2"></i>Export
                 </button>
                 <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('export_annotations', project_id=project.id, format='json') }}">JSON Format</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('export_annotations', project_id=project.id, format='pascal_voc') }}">PASCAL VOC</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('export_annotations', project_id=project.id, format='yolo') }}">YOLO</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_annotations', project_id=project.id, format='zip') }}"><i class="fas fa-file-archive me-2"></i>Download as ZIP (with images)</a></li>
                 </ul>
             </div>
             

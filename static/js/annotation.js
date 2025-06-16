@@ -332,18 +332,20 @@ class AnnotationTool {
     }
     
     draw() {
-        if (!this.renderer) return;
+        if (!this.renderer || !this.renderer.imageLoaded) return;
         
-        // Draw image
+        // Draw image first
         this.renderer.draw();
         
-        // Draw annotations
+        // Draw all annotations
         this.annotations.forEach(annotation => {
-            annotation.draw(this.renderer.ctx, this.renderer);
+            if (annotation.draw) {
+                annotation.draw(this.renderer.ctx, this.renderer);
+            }
         });
         
         // Draw current drawing box
-        if (this.drawingBox) {
+        if (this.drawingBox && this.drawingBox.draw) {
             this.drawingBox.draw(this.renderer.ctx, this.renderer);
         }
     }

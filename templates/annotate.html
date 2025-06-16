@@ -455,6 +455,34 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => location.reload(), 1000);
     }
 
+    // Delete button functionality
+    const deleteBtn = document.getElementById('deleteBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+            const selected = annotationTool.getSelectedAnnotation();
+            if (selected && confirm('Delete selected annotation?')) {
+                if (selected.id) {
+                    // Delete from server
+                    fetch(`/api/annotations/${selected.id}`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            annotationTool.deleteSelectedAnnotation();
+                            updateAnnotationsList();
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+                } else {
+                    // Delete unsaved annotation
+                    annotationTool.deleteSelectedAnnotation();
+                    updateAnnotationsList();
+                }
+            }
+        });
+    }
+
     // Initialize canvas
     annotationTool.init();
 });

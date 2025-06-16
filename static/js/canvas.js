@@ -25,13 +25,9 @@ class CanvasRenderer {
         const maxWidth = Math.max(containerRect.width - 20, minWidth);
         const maxHeight = Math.max(containerRect.height - 20, minHeight);
         
-        // Set up high DPI canvas
-        const dpr = window.devicePixelRatio || 1;
-        
-        this.canvas.width = maxWidth * dpr;
-        this.canvas.height = maxHeight * dpr;
-        
-        this.ctx.scale(dpr, dpr);
+        // Set canvas size directly without DPI scaling for simpler coordinate system
+        this.canvas.width = maxWidth;
+        this.canvas.height = maxHeight;
         this.canvas.style.width = maxWidth + 'px';
         this.canvas.style.height = maxHeight + 'px';
         
@@ -62,25 +58,22 @@ class CanvasRenderer {
     fitImageToCanvas() {
         if (!this.image) return;
         
-        const canvasRect = this.canvas.getBoundingClientRect();
-        const scaleX = canvasRect.width / this.image.width;
-        const scaleY = canvasRect.height / this.image.height;
+        const scaleX = this.canvas.width / this.image.width;
+        const scaleY = this.canvas.height / this.image.height;
         
         // Use a larger scale to fill more of the canvas, allow scaling up to 2x for small images
         this.scale = Math.min(scaleX, scaleY, 2); 
         
         // Center the image
-        this.offsetX = (canvasRect.width - this.image.width * this.scale) / 2;
-        this.offsetY = (canvasRect.height - this.image.height * this.scale) / 2;
+        this.offsetX = (this.canvas.width - this.image.width * this.scale) / 2;
+        this.offsetY = (this.canvas.height - this.image.height * this.scale) / 2;
     }
     
     draw() {
         if (!this.imageLoaded) return;
         
-        const rect = this.canvas.getBoundingClientRect();
-        
         // Clear canvas
-        this.ctx.clearRect(0, 0, rect.width, rect.height);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Draw image
         this.ctx.drawImage(
@@ -103,10 +96,9 @@ class CanvasRenderer {
     }
     
     imageToScreen(imageX, imageY) {
-        const rect = this.canvas.getBoundingClientRect();
         return {
-            x: imageX * this.scale + this.offsetX + rect.left,
-            y: imageY * this.scale + this.offsetY + rect.top
+            x: imageX * this.scale + this.offsetX,
+            y: imageY * this.scale + this.offsetY
         };
     }
     
