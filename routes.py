@@ -6,9 +6,10 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import desc
 
 from app import app, db
-from models import User, Project, Image, Annotation, Label, ProjectAssignment, UserRole
+from models import User, Project, Image, Annotation, Label, ProjectAssignment, UserRole, ProjectType, VideoFrame, VideoAnnotation
 from replit_auth import require_login, require_role, make_replit_blueprint
-from utils import save_uploaded_image, generate_pascal_voc_xml, generate_yolo_format, get_default_label_colors
+from utils import (save_uploaded_image, save_uploaded_video, extract_video_frames, 
+                  batch_process_images, generate_pascal_voc_xml, generate_yolo_format, get_default_label_colors)
 
 # Register auth blueprint
 app.register_blueprint(make_replit_blueprint(), url_prefix="/auth")
@@ -71,6 +72,8 @@ def new_project():
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description', '')
+        project_type = ProjectType(request.form.get('project_type', 'image'))
+        batch_size = int(request.form.get('batch_size', 50))
         
         if not name:
             flash('Project name is required', 'error')
@@ -79,10 +82,42 @@ def new_project():
         project = Project(
             name=name,
             description=description,
+            project_type=project_type,
+            batch_size=batch_size,
             owner_id=current_user.id
         )
         db.session.add(project)
         db.session.commit()
+        
+        # Handle video upload if it's a video project
+        if project_type == ProjectType.VIDEO and 'video_file' in request.files:
+            video_file = request.files['video_file']
+            if video_file.filename != '':
+                app.config['CURRENT_USER_ID'] = current_user.id
+                video_info = save_uploaded_video(video_file, project.id)
+                if video_info:
+                    # Update project with video information
+                    project.video_filename = video_info['filename']
+                    project.video_filepath = video_info['filepath']
+                    project.video_duration = video_info['duration']
+                    project.video_fps = video_info['fps']
+                    project.total_frames = video_info['total_frames']
+                    project.processing_status = 'processing'
+                    db.session.commit()
+                    
+                    # Extract frames in background (simplified for demo)
+                    try:
+                        extract_video_frames(video_info['filepath'], project.id)
+                        project.processing_status = 'completed'
+                        db.session.commit()
+                        flash('Video uploaded and frames extracted successfully!', 'success')
+                    except Exception as e:
+                        project.processing_status = 'failed'
+                        db.session.commit()
+                        flash(f'Error processing video: {str(e)}', 'error')
+                else:
+                    flash('Invalid video file format', 'error')
+                    return render_template('project_form.html')
         
         # Create default labels
         default_labels = [
@@ -127,38 +162,65 @@ def upload_images(project_id):
     if not current_user.can_access_project(project):
         return jsonify({'error': 'Access denied'}), 403
     
+    if project.project_type == ProjectType.VIDEO:
+        return jsonify({'error': 'Cannot upload images to video projects'}), 400
+    
     if 'files' not in request.files:
         return jsonify({'error': 'No files uploaded'}), 400
     
     files = request.files.getlist('files')
-    uploaded_count = 0
     
-    for file in files:
-        if file.filename == '':
-            continue
+    # Use batch processing for large datasets
+    if len(files) > project.batch_size:
+        project.processing_status = 'processing'
+        db.session.commit()
+        
+        try:
+            app.config['CURRENT_USER_ID'] = current_user.id
+            processed_images = batch_process_images(files, project_id, project.batch_size)
+            project.processing_status = 'completed'
+            db.session.commit()
             
-        image_info = save_uploaded_image(file, project_id)
-        if image_info:
-            image = Image(
-                filename=image_info['filename'],
-                original_filename=image_info['original_filename'],
-                filepath=image_info['filepath'],
-                width=image_info['width'],
-                height=image_info['height'],
-                file_size=image_info['file_size'],
-                project_id=project_id,
-                uploaded_by=current_user.id
-            )
-            db.session.add(image)
-            uploaded_count += 1
-    
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'uploaded_count': uploaded_count,
-        'message': f'{uploaded_count} images uploaded successfully'
-    })
+            return jsonify({
+                'success': True,
+                'uploaded_count': len(processed_images),
+                'message': f'{len(processed_images)} images processed in batches',
+                'batch_processed': True
+            })
+        except Exception as e:
+            project.processing_status = 'failed'
+            db.session.commit()
+            return jsonify({'error': f'Batch processing failed: {str(e)}'}), 500
+    else:
+        # Process normally for smaller datasets
+        uploaded_count = 0
+        
+        for file in files:
+            if file.filename == '':
+                continue
+                
+            image_info = save_uploaded_image(file, project_id)
+            if image_info:
+                image = Image(
+                    filename=image_info['filename'],
+                    original_filename=image_info['original_filename'],
+                    filepath=image_info['filepath'],
+                    width=image_info['width'],
+                    height=image_info['height'],
+                    file_size=image_info['file_size'],
+                    project_id=project_id,
+                    uploaded_by=current_user.id
+                )
+                db.session.add(image)
+                uploaded_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'uploaded_count': uploaded_count,
+            'message': f'{uploaded_count} images uploaded successfully'
+        })
 
 @app.route('/projects/<int:project_id>/images/<int:image_id>')
 @require_login
