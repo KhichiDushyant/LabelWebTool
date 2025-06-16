@@ -231,6 +231,7 @@
                             </button>
                         </div>
                     {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -291,6 +292,38 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="uploadBtn">
                     <i class="fas fa-upload me-2"></i>Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Re-extract Frames Modal -->
+<div class="modal fade" id="reextractModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Re-extract Video Frames</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="reextractForm">
+                    <div class="mb-3">
+                        <label for="frameInterval" class="form-label">Frame Interval</label>
+                        <input type="number" class="form-control" id="frameInterval" value="30" min="1" max="300" required>
+                        <div class="form-text">Extract every N frames (lower = more frames)</div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        This will delete all existing frames and annotations. This action cannot be undone.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="reextractBtn">
+                    <i class="fas fa-video me-2"></i>Re-extract Frames
                 </button>
             </div>
         </div>
@@ -445,5 +478,64 @@ document.getElementById('createLabelBtn').addEventListener('click', function() {
         btn.disabled = false;
     });
 });
+
+// Re-extract frames functionality
+document.getElementById('reextractBtn')?.addEventListener('click', function() {
+    const frameInterval = document.getElementById('frameInterval').value;
+    
+    if (!frameInterval || frameInterval < 1) {
+        alert('Please enter a valid frame interval');
+        return;
+    }
+    
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+    btn.disabled = true;
+    
+    fetch(`/projects/{{ project.id }}/reextract-frames`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ frame_interval: parseInt(frameInterval) })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to re-extract frames');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to re-extract frames');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+
+// Auto-refresh processing status for video projects
+{% if project.project_type.value == 'video' and project.processing_status == 'processing' %}
+const statusInterval = setInterval(() => {
+    fetch(`/projects/{{ project.id }}/status`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.processing_status === 'completed') {
+            location.reload();
+            clearInterval(statusInterval);
+        } else if (data.processing_status === 'failed') {
+            alert('Video processing failed');
+            clearInterval(statusInterval);
+        }
+    })
+    .catch(error => {
+        console.error('Status check error:', error);
+    });
+}, 3000); // Check every 3 seconds
+{% endif %}
 </script>
 {% endblock %}
