@@ -177,9 +177,9 @@
                         </div>
                         {% endif %}
                     {% else %}
-                        {% if images %}
+                        {% if images and images.items %}
                             <div class="row g-3">
-                                {% for image in images %}
+                                {% for image in images.items %}
                                 <div class="col-md-4 col-sm-6">
                                     <div class="card image-card">
                                         <div class="position-relative">
@@ -221,6 +221,43 @@
                             </div>
                             {% endfor %}
                         </div>
+                        
+                        <!-- Pagination for Images -->
+                        {% if images.pages > 1 %}
+                        <nav aria-label="Image pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if images.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('project_detail', project_id=project.id, page=images.prev_num) }}">Previous</a>
+                                </li>
+                                {% endif %}
+                                
+                                {% for page_num in images.iter_pages() %}
+                                    {% if page_num %}
+                                        {% if page_num != images.page %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('project_detail', project_id=project.id, page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                        {% else %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                        {% endif %}
+                                    {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if images.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('project_detail', project_id=project.id, page=images.next_num) }}">Next</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
                     {% else %}
                         <div class="text-center py-4">
                             <i class="fas fa-images fa-3x text-muted mb-3"></i>
@@ -248,10 +285,17 @@
                 <div class="card-body">
                     {% if labels %}
                         {% for label in labels %}
-                        <div class="d-flex align-items-center mb-2">
-                            <div class="me-2" style="width: 16px; height: 16px; background-color: {{ label.color }}; border-radius: 2px;"></div>
-                            <span class="flex-grow-1">{{ label.name }}</span>
-                            <small class="text-muted">{{ label.annotations|length }}</small>
+                        <div class="d-flex align-items-center justify-content-between mb-2" id="label-{{ label.id }}">
+                            <div class="d-flex align-items-center">
+                                <div class="me-2" style="width: 16px; height: 16px; background-color: {{ label.color }}; border-radius: 2px;"></div>
+                                <span class="flex-grow-1">{{ label.name }}</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <small class="text-muted me-2">{{ label.annotations|length }}</small>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteLabel({{ label.id }}, '{{ label.name }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
                         {% endfor %}
                     {% else %}
@@ -372,12 +416,12 @@
                 <form id="labelForm">
                     <div class="mb-3">
                         <label for="labelName" class="form-label">Label Name</label>
-                        <input type="text" class="form-control" id="labelName" required>
+                        <input type="text" class="form-control" id="labelName" name="name" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="labelColor" class="form-label">Color</label>
-                        <input type="color" class="form-control form-control-color" id="labelColor" value="#FF6B6B">
+                        <input type="color" class="form-control form-control-color" id="labelColor" name="color" value="#FF6B6B">
                     </div>
                 </form>
             </div>
@@ -588,5 +632,70 @@ const statusInterval = setInterval(() => {
     });
 }, 3000); // Check every 3 seconds
 {% endif %}
+
+// Label management functions
+function deleteLabel(labelId, labelName) {
+    if (!confirm(`Are you sure you want to delete the label "${labelName}"?`)) {
+        return;
+    }
+    
+    fetch(`/labels/${labelId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            document.getElementById(`label-${labelId}`).remove();
+            // Show success message
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.row'));
+        } else {
+            alert(data.error || 'Failed to delete label');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to delete label');
+    });
+}
+
+// Add label form submission
+document.getElementById('labelForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        name: formData.get('name'),
+        color: formData.get('color')
+    };
+    
+    fetch(`/projects/{{ project.id }}/labels`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to create label');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create label');
+    });
+});
 </script>
 {% endblock %}
