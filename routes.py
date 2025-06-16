@@ -8,7 +8,7 @@ from sqlalchemy import desc
 from app import app, db
 from models import User, Project, Image, Annotation, Label, ProjectAssignment, UserRole, ProjectType, VideoFrame, VideoAnnotation
 from replit_auth import require_login, require_role, make_replit_blueprint
-from utils import (save_uploaded_image, save_uploaded_video, extract_video_frames, 
+from utils import (save_uploaded_image, save_uploaded_video, extract_video_frames, extract_video_frames_by_fps,
                   batch_process_images, generate_pascal_voc_xml, generate_yolo_format, get_default_label_colors)
 
 # Register auth blueprint
@@ -92,7 +92,7 @@ def new_project():
         # Handle video upload if it's a video project
         if project_type == ProjectType.VIDEO and 'video_file' in request.files:
             video_file = request.files['video_file']
-            frame_interval = int(request.form.get('frame_interval', 30))  # Extract every N frames
+            extraction_method = request.form.get('extraction_method', 'interval')
             
             if video_file.filename != '':
                 app.config['CURRENT_USER_ID'] = current_user.id
@@ -107,10 +107,15 @@ def new_project():
                     project.processing_status = 'processing'
                     db.session.commit()
                     
-                    # Start frame extraction in background
+                    # Start frame extraction based on method
                     try:
-                        # For now, extract frames synchronously but improve UI feedback
-                        extracted_frames = extract_video_frames(video_info['filepath'], project.id, frame_interval)
+                        if extraction_method == 'fps':
+                            target_fps = float(request.form.get('target_fps', 1.0))
+                            extracted_frames = extract_video_frames_by_fps(video_info['filepath'], project.id, target_fps)
+                        else:
+                            frame_interval = int(request.form.get('frame_interval', 30))
+                            extracted_frames = extract_video_frames(video_info['filepath'], project.id, frame_interval)
+                        
                         project.processing_status = 'completed'
                         db.session.commit()
                         flash(f'Video uploaded successfully! Extracted {len(extracted_frames)} frames for annotation.', 'success')
