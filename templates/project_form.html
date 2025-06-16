@@ -18,7 +18,7 @@
                     <h5 class="mb-0">Create New Project</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <div class="mb-3">
                             <label for="name" class="form-label">Project Name</label>
                             <input type="text" class="form-control" id="name" name="name" required 
@@ -31,9 +31,60 @@
                                       placeholder="Optional project description"></textarea>
                         </div>
                         
+                        <div class="mb-4">
+                            <label class="form-label">Project Type</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card project-type-card" data-type="image">
+                                        <div class="card-body text-center">
+                                            <input type="radio" name="project_type" value="image" id="type_image" checked class="d-none">
+                                            <i class="fas fa-images fa-3x text-primary mb-3"></i>
+                                            <h5>Image Dataset</h5>
+                                            <p class="text-muted small">
+                                                Annotate multiple images (supports up to 10,000+ images with batch processing)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="card project-type-card" data-type="video">
+                                        <div class="card-body text-center">
+                                            <input type="radio" name="project_type" value="video" id="type_video" class="d-none">
+                                            <i class="fas fa-video fa-3x text-info mb-3"></i>
+                                            <h5>Video Annotation</h5>
+                                            <p class="text-muted small">
+                                                Annotate video frames with temporal tracking and frame-by-frame analysis
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Video upload section -->
+                        <div id="videoUploadSection" class="mb-3" style="display: none;">
+                            <label for="videoFile" class="form-label">Video File</label>
+                            <input type="file" class="form-control" id="videoFile" name="video_file" 
+                                   accept="video/mp4,video/avi,video/mov,video/mkv">
+                            <div class="form-text">Supported formats: MP4, AVI, MOV, MKV (Max: 500MB)</div>
+                        </div>
+                        
+                        <!-- Batch processing options -->
+                        <div id="batchOptions" class="mb-3">
+                            <label for="batchSize" class="form-label">Batch Size</label>
+                            <select class="form-select" id="batchSize" name="batch_size">
+                                <option value="25">25 images per page</option>
+                                <option value="50" selected>50 images per page</option>
+                                <option value="100">100 images per page</option>
+                                <option value="200">200 images per page</option>
+                            </select>
+                            <div class="form-text">For large datasets, smaller batch sizes improve loading performance</div>
+                        </div>
+                        
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            <small>
+                            <small id="projectTypeInfo">
                                 Your project will be created with default labels: person, car, bicycle, dog, cat. 
                                 You can add more labels after creation.
                             </small>
@@ -51,4 +102,68 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.project-type-card {
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 2px solid var(--bs-gray-700);
+}
+
+.project-type-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.project-type-card.active {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const projectTypeCards = document.querySelectorAll('.project-type-card');
+    const videoUploadSection = document.getElementById('videoUploadSection');
+    const batchOptions = document.getElementById('batchOptions');
+    const projectTypeInfo = document.getElementById('projectTypeInfo');
+    
+    // Set initial state
+    updateSelection('image');
+    
+    projectTypeCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const type = this.dataset.type;
+            
+            // Update radio selection
+            document.getElementById('type_' + type).checked = true;
+            
+            updateSelection(type);
+        });
+    });
+    
+    function updateSelection(type) {
+        // Update card styling
+        projectTypeCards.forEach(card => {
+            card.classList.remove('active');
+            if (card.dataset.type === type) {
+                card.classList.add('active');
+            }
+        });
+        
+        // Show/hide relevant sections
+        if (type === 'video') {
+            videoUploadSection.style.display = 'block';
+            batchOptions.style.display = 'none';
+            projectTypeInfo.textContent = 'Upload a video file and the system will automatically extract frames for annotation. You can navigate frame-by-frame and track objects across time.';
+        } else {
+            videoUploadSection.style.display = 'none';
+            batchOptions.style.display = 'block';
+            projectTypeInfo.textContent = 'Your project will be created with default labels: person, car, bicycle, dog, cat. You can add more labels after creation. Large datasets are handled with efficient batch processing.';
+        }
+    }
+});
+</script>
 {% endblock %}

@@ -1,10 +1,13 @@
 import os
 import uuid
+import cv2
+import numpy as np
 from PIL import Image
 from werkzeug.utils import secure_filename
 from flask import current_app
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
 
 def allowed_file(filename):
     return '.' in filename and \

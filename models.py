@@ -11,6 +11,11 @@ class UserRole(Enum):
     ANNOTATOR = "annotator"
     REVIEWER = "reviewer"
 
+# Project types enum
+class ProjectType(Enum):
+    IMAGE = "image"
+    VIDEO = "video"
+
 # (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -66,30 +71,48 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
+    project_type = db.Column(db.Enum(ProjectType), default=ProjectType.IMAGE, nullable=False)
     owner_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Video-specific fields
+    video_filename = db.Column(db.String(255), nullable=True)
+    video_filepath = db.Column(db.String(500), nullable=True)
+    video_duration = db.Column(db.Float, nullable=True)  # in seconds
+    video_fps = db.Column(db.Float, nullable=True)
+    total_frames = db.Column(db.Integer, nullable=True)
+    
+    # Batch processing fields
+    batch_size = db.Column(db.Integer, default=50)  # For pagination
+    processing_status = db.Column(db.String(50), default='pending')  # pending, processing, completed, failed
     
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relationships
     images = db.relationship('Image', backref='project', lazy=True, cascade='all, delete-orphan')
+    video_frames = db.relationship('VideoFrame', backref='project', lazy=True, cascade='all, delete-orphan')
     labels = db.relationship('Label', backref='project', lazy=True, cascade='all, delete-orphan')
     assignments = db.relationship('ProjectAssignment', backref='project', lazy=True, cascade='all, delete-orphan')
 
     @property
     def total_images(self):
-        return len(self.images)
+        if self.project_type == ProjectType.VIDEO:
+            return self.total_frames or 0
+        return Image.query.filter_by(project_id=self.id).count()
 
     @property
     def annotated_images(self):
-        return len([img for img in self.images if img.annotations])
+        if self.project_type == ProjectType.VIDEO:
+            return VideoFrame.query.filter_by(project_id=self.id).filter(VideoFrame.annotations.any()).count()
+        return Image.query.filter_by(project_id=self.id).filter(Image.annotations.any()).count()
 
     @property
     def progress_percentage(self):
-        if self.total_images == 0:
+        total = self.total_images
+        if total == 0:
             return 0
-        return round((self.annotated_images / self.total_images) * 100, 1)
+        return round((self.annotated_images / total) * 100, 1)
 
 class ProjectAssignment(db.Model):
     __tablename__ = 'project_assignments'
@@ -134,7 +157,7 @@ class Image(db.Model):
 
     @property
     def is_annotated(self):
-        return len(self.annotations) > 0
+        return Annotation.query.filter_by(image_id=self.id).count() > 0
 
 class Annotation(db.Model):
     __tablename__ = 'annotations'
@@ -156,6 +179,61 @@ class Annotation(db.Model):
     
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    @property
+    def bbox_dict(self):
+        return {
+            'x': self.x,
+            'y': self.y,
+            'width': self.width,
+            'height': self.height
+        }
+
+class VideoFrame(db.Model):
+    __tablename__ = 'video_frames'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    frame_number = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.Float, nullable=False)  # Time in seconds
+    thumbnail_path = db.Column(db.String(500), nullable=False)
+    width = db.Column(db.Integer, nullable=False)
+    height = db.Column(db.Integer, nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relationships
+    annotations = db.relationship('VideoAnnotation', backref='frame', lazy=True, cascade='all, delete-orphan')
+    
+    __table_args__ = (UniqueConstraint('project_id', 'frame_number', name='uq_frame_project'),)
+
+    @property
+    def is_annotated(self):
+        return VideoAnnotation.query.filter_by(frame_id=self.id).count() > 0
+
+class VideoAnnotation(db.Model):
+    __tablename__ = 'video_annotations'
+    id = db.Column(db.Integer, primary_key=True)
+    frame_id = db.Column(db.Integer, db.ForeignKey('video_frames.id'), nullable=False)
+    label_id = db.Column(db.Integer, db.ForeignKey('labels.id'), nullable=False)
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    
+    # Bounding box coordinates
+    x = db.Column(db.Float, nullable=False)
+    y = db.Column(db.Float, nullable=False)
+    width = db.Column(db.Float, nullable=False)
+    height = db.Column(db.Float, nullable=False)
+    
+    # Optional fields
+    confidence = db.Column(db.Float, default=1.0)
+    notes = db.Column(db.Text)
+    is_verified = db.Column(db.Boolean, default=False)
+    
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Relationships
+    label = db.relationship('Label', backref='video_annotations')
+    user = db.relationship('User', backref='video_annotations')
 
     @property
     def bbox_dict(self):
