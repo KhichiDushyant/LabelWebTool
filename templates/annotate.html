@@ -204,227 +204,254 @@
 <script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
 <script src="{{ url_for('static', filename='js/annotation.js') }}"></script>
 <script>
-// Initialize annotation tool
-const annotationTool = new AnnotationTool({
-    canvasId: 'annotationCanvas',
-    imageUrl: '{{ url_for("serve_image", project_id=image.project.id, image_id=image.id) }}',
-    imageWidth: {{ image.width }},
-    imageHeight: {{ image.height }},
-    annotations: {{ annotations|map(attribute='bbox_dict')|list|tojson }},
-    annotationIds: {{ annotations|map(attribute='id')|list|tojson }},
-    annotationLabels: {{ annotations|map(attribute='label_id')|list|tojson }},
-    labels: {
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('annotationCanvas');
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+
+    // Prepare labels data
+    const labelsData = [
         {% for label in labels %}
-        {{ label.id }}: {
-            name: '{{ label.name }}',
-            color: '{{ label.color }}'
+        {
+            id: {{ label.id }},
+            name: "{{ label.name }}",
+            color: "{{ label.color }}"
         }{% if not loop.last %},{% endif %}
         {% endfor %}
-    }
-});
+    ];
 
-// Label selection
-document.querySelectorAll('.label-item').forEach((item, index) => {
-    item.addEventListener('click', function() {
-        document.querySelectorAll('.label-item').forEach(i => i.classList.remove('active'));
-        this.classList.add('active');
-        annotationTool.setSelectedLabel(parseInt(this.dataset.labelId));
+    // Prepare annotations data
+    const annotationsData = [
+        {% for annotation in annotations %}
+        {
+            id: {{ annotation.id }},
+            x: {{ annotation.x }},
+            y: {{ annotation.y }},
+            width: {{ annotation.width }},
+            height: {{ annotation.height }},
+            label_id: {{ annotation.label_id }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Initialize annotation tool
+    const annotationTool = new AnnotationTool({
+        canvas: canvas,
+        imageUrl: '{{ url_for("serve_image", project_id=image.project.id, image_id=image.id) }}',
+        imageWidth: {{ image.width }},
+        imageHeight: {{ image.height }},
+        labels: labelsData,
+        annotations: annotationsData,
+        annotationIds: [{% for annotation in annotations %}{{ annotation.id }}{% if not loop.last %},{% endif %}{% endfor %}],
+        labelIds: [{% for annotation in annotations %}{{ annotation.label_id }}{% if not loop.last %},{% endif %}{% endfor %}]
     });
-    
-    // Keyboard shortcuts for labels (1-9)
-    document.addEventListener('keydown', function(e) {
-        if (e.key === (index + 1).toString() && !e.ctrlKey && !e.altKey) {
-            item.click();
+
+    // Label selection
+    document.querySelectorAll('.label-item').forEach((item, index) => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.label-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            annotationTool.setSelectedLabel(parseInt(this.dataset.labelId));
+        });
+    });
+
+    // Select first label by default
+    if (document.querySelector('.label-item')) {
+        document.querySelector('.label-item').click();
+    }
+
+    // Annotation selection
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.annotation-item')) {
+            const item = e.target.closest('.annotation-item');
+            document.querySelectorAll('.annotation-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            
+            const annotationId = parseInt(item.dataset.annotationId);
+            annotationTool.selectAnnotation(annotationId);
         }
     });
-});
 
-// Select first label by default
-if (document.querySelector('.label-item')) {
-    document.querySelector('.label-item').click();
-}
+    // Delete annotation
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-annotation')) {
+            e.stopPropagation();
+            const annotationId = parseInt(e.target.closest('.delete-annotation').dataset.annotationId);
+            
+            if (confirm('Delete this annotation?')) {
+                fetch(`/api/annotations/${annotationId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        annotationTool.removeAnnotation(annotationId);
+                        updateAnnotationsList();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+    });
 
-// Annotation selection
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.annotation-item')) {
-        const item = e.target.closest('.annotation-item');
-        document.querySelectorAll('.annotation-item').forEach(i => i.classList.remove('selected'));
-        item.classList.add('selected');
+    // Zoom controls
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    
+    if (zoomInBtn) zoomInBtn.addEventListener('click', () => annotationTool.zoomIn());
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => annotationTool.zoomOut());
+    if (resetZoomBtn) resetZoomBtn.addEventListener('click', () => annotationTool.resetZoom());
+
+    // Save button
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', function() {
+        const unsavedAnnotations = annotationTool.getUnsavedAnnotations();
         
-        const annotationId = parseInt(item.dataset.annotationId);
-        annotationTool.selectAnnotation(annotationId);
-    }
-});
-
-// Delete annotation
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.delete-annotation')) {
-        e.stopPropagation();
-        const annotationId = parseInt(e.target.closest('.delete-annotation').dataset.annotationId);
+        if (unsavedAnnotations.length === 0) {
+            alert('No changes to save');
+            return;
+        }
         
-        if (confirm('Delete this annotation?')) {
-            fetch(`/api/annotations/${annotationId}`, {
-                method: 'DELETE'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.message) {
-                    annotationTool.removeAnnotation(annotationId);
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+        btn.disabled = true;
+        
+        Promise.all(unsavedAnnotations.map(annotation => {
+            return fetch('/api/annotations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_id: {{ image.id }},
+                    label_id: annotation.labelId,
+                    x: annotation.x,
+                    y: annotation.y,
+                    width: annotation.width,
+                    height: annotation.height
+                })
+            }).then(response => response.json());
+        }))
+        .then(results => {
+            annotationTool.markAnnotationsSaved();
+            updateAnnotationsList();
+            alert('Annotations saved successfully!');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to save annotations');
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Don't trigger shortcuts when typing in inputs
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        switch(e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                {% if prev_image %}
+                window.location.href = '{{ url_for("annotate_image", image_id=prev_image.id) }}';
+                {% endif %}
+                break;
+                
+            case 'ArrowRight':
+                e.preventDefault();
+                {% if next_image %}
+                window.location.href = '{{ url_for("annotate_image", image_id=next_image.id) }}';
+                {% endif %}
+                break;
+                
+            case 'z':
+            case 'Z':
+                if (!e.ctrlKey) {
+                    e.preventDefault();
+                    annotationTool.zoomIn();
+                }
+                break;
+                
+            case 'x':
+            case 'X':
+                e.preventDefault();
+                annotationTool.zoomOut();
+                break;
+                
+            case 'r':
+            case 'R':
+                e.preventDefault();
+                annotationTool.resetZoom();
+                break;
+                
+            case 'Delete':
+            case 'Backspace':
+                e.preventDefault();
+                const selected = annotationTool.getSelectedAnnotation();
+                if (selected && confirm('Delete selected annotation?')) {
+                    annotationTool.deleteSelectedAnnotation();
                     updateAnnotationsList();
                 }
-            })
-            .catch(error => console.error('Error:', error));
-        }
-    }
-});
-
-// Zoom controls
-document.getElementById('zoomInBtn').addEventListener('click', () => annotationTool.zoomIn());
-document.getElementById('zoomOutBtn').addEventListener('click', () => annotationTool.zoomOut());
-document.getElementById('resetZoomBtn').addEventListener('click', () => annotationTool.resetZoom());
-
-// Save button
-document.getElementById('saveBtn').addEventListener('click', function() {
-    const unsavedAnnotations = annotationTool.getUnsavedAnnotations();
-    
-    if (unsavedAnnotations.length === 0) {
-        alert('No changes to save');
-        return;
-    }
-    
-    const btn = this;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
-    btn.disabled = true;
-    
-    Promise.all(unsavedAnnotations.map(annotation => {
-        return fetch('/api/annotations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                image_id: {{ image.id }},
-                label_id: annotation.labelId,
-                x: annotation.x,
-                y: annotation.y,
-                width: annotation.width,
-                height: annotation.height
-            })
-        }).then(response => response.json());
-    }))
-    .then(results => {
-        annotationTool.markAnnotationsSaved();
-        updateAnnotationsList();
-        alert('Annotations saved successfully!');
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to save annotations');
-    })
-    .finally(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    });
-});
-
-// Keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    // Don't trigger shortcuts when typing in inputs
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-    }
-    
-    switch(e.key) {
-        case 'ArrowLeft':
-            e.preventDefault();
-            {% if prev_image %}
-            window.location.href = '{{ url_for("annotate_image", image_id=prev_image.id) }}';
-            {% endif %}
-            break;
-            
-        case 'ArrowRight':
-            e.preventDefault();
-            {% if next_image %}
-            window.location.href = '{{ url_for("annotate_image", image_id=next_image.id) }}';
-            {% endif %}
-            break;
-            
-        case 'z':
-        case 'Z':
-            if (!e.ctrlKey) {
+                break;
+                
+            case 'Escape':
+                e.preventDefault();
+                annotationTool.cancelDrawing();
+                break;
+                
+            case '+':
+            case '=':
                 e.preventDefault();
                 annotationTool.zoomIn();
-            }
-            break;
-            
-        case 'x':
-        case 'X':
-            e.preventDefault();
-            annotationTool.zoomOut();
-            break;
-            
-        case 'r':
-        case 'R':
-            e.preventDefault();
-            annotationTool.resetZoom();
-            break;
-            
-        case 'Delete':
-        case 'Backspace':
-            e.preventDefault();
-            const selected = annotationTool.getSelectedAnnotation();
-            if (selected && confirm('Delete selected annotation?')) {
-                annotationTool.deleteSelectedAnnotation();
-                updateAnnotationsList();
-            }
-            break;
-            
-        case 'Escape':
-            e.preventDefault();
-            annotationTool.cancelDrawing();
-            break;
-            
-        case '+':
-        case '=':
-            e.preventDefault();
-            annotationTool.zoomIn();
-            break;
-            
-        case '-':
-            e.preventDefault();
-            annotationTool.zoomOut();
-            break;
-    }
-    
-    // Number keys for label selection
-    if (e.key >= '1' && e.key <= '9') {
-        const labelIndex = parseInt(e.key) - 1;
-        const labels = {{ labels|tojson }};
-        if (labelIndex < labels.length) {
-            const labelItems = document.querySelectorAll('.label-item');
-            if (labelItems[labelIndex]) {
-                labelItems[labelIndex].click();
+                break;
+                
+            case '-':
+                e.preventDefault();
+                annotationTool.zoomOut();
+                break;
+        }
+        
+        // Number keys for label selection
+        if (e.key >= '1' && e.key <= '9') {
+            const labelIndex = parseInt(e.key) - 1;
+            if (labelIndex < labelsData.length) {
+                const labelItems = document.querySelectorAll('.label-item');
+                if (labelItems[labelIndex]) {
+                    labelItems[labelIndex].click();
+                }
             }
         }
+        
+        // Save shortcut
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            const saveBtn = document.getElementById('saveBtn');
+            if (saveBtn) saveBtn.click();
+        }
+    });
+
+    // Update annotations list function
+    function updateAnnotationsList() {
+        const count = annotationTool.getAnnotationCount();
+        const countElement = document.getElementById('annotationCount');
+        if (countElement) {
+            countElement.textContent = count;
+        }
+        
+        // Refresh the page to update the annotations list
+        setTimeout(() => location.reload(), 1000);
     }
-    
-    // Save shortcut
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        document.getElementById('saveBtn').click();
-    }
+
+    // Initialize canvas
+    annotationTool.init();
 });
-
-// Update annotations list
-function updateAnnotationsList() {
-    const count = annotationTool.getAnnotationCount();
-    document.getElementById('annotationCount').textContent = count;
-    
-    // Refresh the page to update the annotations list
-    // In a real application, you might want to update this dynamically
-    setTimeout(() => location.reload(), 1000);
-}
-
-// Initialize canvas
-annotationTool.init();
 </script>
 {% endblock %}
