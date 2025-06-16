@@ -149,17 +149,35 @@ def project_detail(project_id):
     if not current_user.can_access_project(project):
         return render_template('403.html'), 403
     
+    page = request.args.get('page', 1, type=int)
+    per_page = 12  # Number of items per page
+    
+    labels = Label.query.filter_by(project_id=project_id).all()
+    
     if project.project_type == ProjectType.VIDEO:
-        # Get video frames instead of images
-        video_frames = VideoFrame.query.filter_by(project_id=project_id).all()
-        labels = Label.query.filter_by(project_id=project_id).all()
+        # Get paginated video frames
+        video_frames = VideoFrame.query.filter_by(project_id=project_id)\
+                                       .order_by(VideoFrame.frame_number)\
+                                       .paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Fix frame counting
+        total_frames = VideoFrame.query.filter_by(project_id=project_id).count()
+        annotated_frames = VideoFrame.query.filter_by(project_id=project_id)\
+                                          .join(VideoAnnotation)\
+                                          .distinct(VideoFrame.id).count()
+        
         return render_template('project_detail.html', 
                              project=project, 
                              video_frames=video_frames,
-                             labels=labels)
+                             labels=labels,
+                             total_frames=total_frames,
+                             annotated_frames=annotated_frames)
     else:
-        images = Image.query.filter_by(project_id=project_id).all()
-        labels = Label.query.filter_by(project_id=project_id).all()
+        # Get paginated images
+        images = Image.query.filter_by(project_id=project_id)\
+                           .order_by(Image.created_at.desc())\
+                           .paginate(page=page, per_page=per_page, error_out=False)
+        
         return render_template('project_detail.html', 
                              project=project, 
                              images=images, 
@@ -296,9 +314,11 @@ def reextract_video_frames(project_id):
         if 'target_fps' in data:
             target_fps = int(data.get('target_fps', 1))
             if target_fps == 0:  # Extract all frames
+                from utils import extract_video_frames_by_fps
                 extracted_frames = extract_video_frames_by_fps(project.video_filepath, project_id, None)
                 message = f'Extracted all frames'
             else:
+                from utils import extract_video_frames_by_fps
                 extracted_frames = extract_video_frames_by_fps(project.video_filepath, project_id, target_fps)
                 message = f'Extracted frames at {target_fps} FPS'
         else:
@@ -553,21 +573,91 @@ def export_annotations(project_id, format):
     if not current_user.can_access_project(project):
         return render_template('403.html'), 403
     
-    if format not in ['pascal_voc', 'yolo']:
+    if format not in ['pascal_voc', 'yolo', 'json']:
         return jsonify({'error': 'Invalid export format'}), 400
     
-    images = Image.query.filter_by(project_id=project_id).all()
     export_data = {}
     
-    for image in images:
-        annotations = Annotation.query.filter_by(image_id=image.id).all()
-        if annotations:
-            if format == 'pascal_voc':
-                export_data[image.original_filename] = generate_pascal_voc_xml(image, annotations)
-            elif format == 'yolo':
-                export_data[image.original_filename] = generate_yolo_format(image, annotations)
+    if project.project_type == ProjectType.VIDEO:
+        # Export video annotations
+        video_frames = VideoFrame.query.filter_by(project_id=project_id).all()
+        for frame in video_frames:
+            annotations = VideoAnnotation.query.filter_by(frame_id=frame.id).all()
+            if annotations:
+                frame_data = {
+                    'frame_number': frame.frame_number,
+                    'timestamp': frame.timestamp,
+                    'annotations': []
+                }
+                for ann in annotations:
+                    frame_data['annotations'].append({
+                        'label': ann.label.name,
+                        'x': ann.x,
+                        'y': ann.y,
+                        'width': ann.width,
+                        'height': ann.height,
+                        'confidence': ann.confidence,
+                        'notes': ann.notes,
+                        'annotator': ann.user.display_name()
+                    })
+                export_data[f'frame_{frame.frame_number:06d}'] = frame_data
+    else:
+        # Export image annotations
+        images = Image.query.filter_by(project_id=project_id).all()
+        for image in images:
+            annotations = Annotation.query.filter_by(image_id=image.id).all()
+            if annotations:
+                if format == 'json':
+                    image_data = {
+                        'filename': image.original_filename,
+                        'width': image.width,
+                        'height': image.height,
+                        'annotations': []
+                    }
+                    for ann in annotations:
+                        image_data['annotations'].append({
+                            'label': ann.label.name,
+                            'x': ann.x,
+                            'y': ann.y,
+                            'width': ann.width,
+                            'height': ann.height,
+                            'confidence': ann.confidence,
+                            'notes': ann.notes,
+                            'annotator': ann.user.display_name()
+                        })
+                    export_data[image.original_filename] = image_data
+                elif format == 'pascal_voc':
+                    export_data[image.original_filename] = generate_pascal_voc_xml(image, annotations)
+                elif format == 'yolo':
+                    export_data[image.original_filename] = generate_yolo_format(image, annotations)
     
-    return jsonify(export_data)
+    if not export_data:
+        return jsonify({'message': 'No annotations found to export', 'data': {}})
+    
+    return jsonify({'data': export_data, 'total_items': len(export_data)})
+
+@app.route('/labels/<int:label_id>', methods=['DELETE'])
+@require_login
+def delete_label(label_id):
+    label = Label.query.get_or_404(label_id)
+    project = Project.query.get_or_404(label.project_id)
+    
+    if not current_user.can_access_project(project):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # Check if label is being used in annotations
+    if project.project_type == ProjectType.VIDEO:
+        annotation_count = VideoAnnotation.query.filter_by(label_id=label_id).count()
+    else:
+        annotation_count = Annotation.query.filter_by(label_id=label_id).count()
+    
+    if annotation_count > 0:
+        return jsonify({'error': f'Cannot delete label. It is used in {annotation_count} annotations.'}), 400
+    
+    db.session.delete(label)
+    db.session.commit()
+    
+    return jsonify({'message': 'Label deleted successfully'})
 
 @app.route('/admin')
 @require_role(UserRole.ADMIN)

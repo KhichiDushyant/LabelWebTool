@@ -114,8 +114,8 @@ class AnnotationTool {
     onMouseDown(e) {
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
         
         // Check if clicking on an existing annotation
         const clickedAnnotation = this.getAnnotationAt(x, y);
@@ -208,6 +208,7 @@ class AnnotationTool {
     }
     
     onMouseUp(e) {
+        if (!e) e = { clientX: 0, clientY: 0 };
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
