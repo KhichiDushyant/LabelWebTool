@@ -603,7 +603,7 @@ def export_annotations(project_id, format):
                         'height': ann.height,
                         'confidence': ann.confidence,
                         'notes': ann.notes,
-                        'annotator': ann.user.display_name()
+                        'annotator': ann.user.display_name
                     })
                 export_data[f'frame_{frame.frame_number:06d}'] = frame_data
     else:
@@ -628,7 +628,7 @@ def export_annotations(project_id, format):
                             'height': ann.height,
                             'confidence': ann.confidence,
                             'notes': ann.notes,
-                            'annotator': ann.user.display_name()
+                            'annotator': ann.user.display_name
                         })
                     export_data[image.original_filename] = image_data
                 elif format == 'pascal_voc':

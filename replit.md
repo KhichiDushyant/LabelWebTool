@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a web-based image annotation platform built with Flask for creating high-quality training datasets. The application provides an intuitive interface for annotating images with bounding boxes, managing annotation projects, and exporting data in popular formats like PASCAL VOC and YOLO.
+This is a web-based image and video annotation platform built with Flask for creating high-quality training datasets. The application provides an intuitive interface for annotating images and video frames with bounding boxes, managing annotation projects, and exporting data in popular formats like PASCAL VOC, YOLO, and JSON. Features comprehensive video processing with customizable frame extraction rates.
 
 ## System Architecture
 
@@ -103,6 +103,13 @@ This is a web-based image annotation platform built with Flask for creating high
 ## Changelog
 
 - June 16, 2025. Initial setup
+- June 16, 2025. Migration to Replit environment completed with enhancements:
+  - Added video frame extraction with FPS options (0.5-10 FPS or every N frames)
+  - Fixed pagination display for both images and video frames  
+  - Enhanced video processing with interval and target FPS methods
+  - Fixed export annotation functionality for YOLO, PASCAL VOC, and JSON formats
+  - Added interactive annotation editing and deletion capabilities
+  - Implemented proper pagination controls for video frame navigation
 
 ## User Preferences
 

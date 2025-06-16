@@ -180,6 +180,43 @@
                                 </div>
                                 {% endfor %}
                             </div>
+                            
+                            <!-- Video frames pagination -->
+                            {% if video_frames.pages > 1 %}
+                            <nav aria-label="Video frames pagination" class="mt-4">
+                                <ul class="pagination justify-content-center">
+                                    {% if video_frames.has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('project_detail', project_id=project.id, page=video_frames.prev_num) }}">Previous</a>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% for page_num in video_frames.iter_pages() %}
+                                        {% if page_num %}
+                                            {% if page_num != video_frames.page %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="{{ url_for('project_detail', project_id=project.id, page=page_num) }}">{{ page_num }}</a>
+                                            </li>
+                                            {% else %}
+                                            <li class="page-item active">
+                                                <span class="page-link">{{ page_num }}</span>
+                                            </li>
+                                            {% endif %}
+                                        {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">...</span>
+                                        </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if video_frames.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('project_detail', project_id=project.id, page=video_frames.next_num) }}">Next</a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                            {% endif %}
                         {% else %}
                         <div class="text-center py-5">
                             <i class="fas fa-video fa-3x text-muted mb-3"></i>
