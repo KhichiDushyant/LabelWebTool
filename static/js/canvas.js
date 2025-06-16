@@ -183,8 +183,8 @@ class AnnotationBox {
         ctx.setLineDash(this.saved ? [] : [5, 5]);
         
         ctx.strokeRect(
-            screenCoords.x - renderer.canvas.getBoundingClientRect().left,
-            screenCoords.y - renderer.canvas.getBoundingClientRect().top,
+            screenCoords.x,
+            screenCoords.y,
             screenWidth,
             screenHeight
         );
@@ -193,8 +193,8 @@ class AnnotationBox {
         if (this.selected || this.hover) {
             ctx.fillStyle = this.color + '20'; // 20 for alpha
             ctx.fillRect(
-                screenCoords.x - renderer.canvas.getBoundingClientRect().left,
-                screenCoords.y - renderer.canvas.getBoundingClientRect().top,
+                screenCoords.x,
+                screenCoords.y,
                 screenWidth,
                 screenHeight
             );
@@ -212,14 +212,13 @@ class AnnotationBox {
         const screenCoords = renderer.imageToScreen(this.x, this.y);
         const screenWidth = this.width * renderer.scale;
         const screenHeight = this.height * renderer.scale;
-        const rect = renderer.canvas.getBoundingClientRect();
         
         const handleSize = 6;
         const handles = [
-            { x: screenCoords.x - rect.left - handleSize/2, y: screenCoords.y - rect.top - handleSize/2 }, // Top-left
-            { x: screenCoords.x - rect.left + screenWidth - handleSize/2, y: screenCoords.y - rect.top - handleSize/2 }, // Top-right
-            { x: screenCoords.x - rect.left - handleSize/2, y: screenCoords.y - rect.top + screenHeight - handleSize/2 }, // Bottom-left
-            { x: screenCoords.x - rect.left + screenWidth - handleSize/2, y: screenCoords.y - rect.top + screenHeight - handleSize/2 } // Bottom-right
+            { x: screenCoords.x - handleSize/2, y: screenCoords.y - handleSize/2 }, // Top-left
+            { x: screenCoords.x + screenWidth - handleSize/2, y: screenCoords.y - handleSize/2 }, // Top-right
+            { x: screenCoords.x - handleSize/2, y: screenCoords.y + screenHeight - handleSize/2 }, // Bottom-left
+            { x: screenCoords.x + screenWidth - handleSize/2, y: screenCoords.y + screenHeight - handleSize/2 } // Bottom-right
         ];
         
         ctx.fillStyle = this.color;

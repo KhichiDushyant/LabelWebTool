@@ -578,7 +578,7 @@ def export_annotations(project_id, format):
     if not current_user.can_access_project(project):
         return render_template('403.html'), 403
     
-    if format not in ['pascal_voc', 'yolo', 'json']:
+    if format not in ['pascal_voc', 'yolo', 'json', 'zip']:
         return jsonify({'error': 'Invalid export format'}), 400
     
     export_data = {}
@@ -638,6 +638,44 @@ def export_annotations(project_id, format):
     
     if not export_data:
         return jsonify({'message': 'No annotations found to export', 'data': {}})
+    
+    # Handle zip export with images and annotations
+    if format == 'zip':
+        import zipfile
+        import tempfile
+        import shutil
+        from io import BytesIO
+        
+        # Create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create zip in memory
+            zip_buffer = BytesIO()
+            
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # Add annotations file
+                annotations_json = json.dumps(export_data, indent=2)
+                zip_file.writestr('annotations.json', annotations_json)
+                
+                # Add images
+                if project.project_type == ProjectType.IMAGE:
+                    images = Image.query.filter_by(project_id=project_id).all()
+                    for image in images:
+                        if os.path.exists(image.filepath):
+                            zip_file.write(image.filepath, f'images/{image.original_filename}')
+                
+                # Add labels file
+                labels = Label.query.filter_by(project_id=project_id).all()
+                labels_data = [{'id': l.id, 'name': l.name, 'color': l.color} for l in labels]
+                zip_file.writestr('labels.json', json.dumps(labels_data, indent=2))
+            
+            zip_buffer.seek(0)
+            
+            from flask import Response
+            return Response(
+                zip_buffer.getvalue(),
+                mimetype='application/zip',
+                headers={'Content-Disposition': f'attachment; filename={project.name}_annotations.zip'}
+            )
     
     return jsonify({'data': export_data, 'total_items': len(export_data)})
 

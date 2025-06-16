@@ -114,14 +114,19 @@ class AnnotationTool {
     onMouseDown(e) {
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
         
         // Check if clicking on an existing annotation
         const clickedAnnotation = this.getAnnotationAt(x, y);
         
         if (clickedAnnotation) {
-            this.selectAnnotation(clickedAnnotation.id);
+            this.selectedAnnotation = clickedAnnotation;
+            this.selectedAnnotation.selected = true;
+            this.annotations.forEach(ann => {
+                if (ann !== this.selectedAnnotation) ann.selected = false;
+            });
+            this.updateAnnotationSelection();
             this.isDragging = true;
             this.dragStart = { x, y };
             this.canvas.style.cursor = 'move';
@@ -163,7 +168,7 @@ class AnnotationTool {
             const constrainedWidth = Math.min(width, this.imageWidth - constrainedX);
             const constrainedHeight = Math.min(height, this.imageHeight - constrainedY);
             
-            if (constrainedWidth > 5 && constrainedHeight > 5) {
+            if (constrainedWidth > 1 && constrainedHeight > 1) {
                 const label = this.labels[this.selectedLabelId];
                 if (label) {
                     this.drawingBox = new AnnotationBox(
