@@ -241,6 +241,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
+    
+
 
     // Initialize annotation tool
     const annotationTool = new AnnotationTool({
@@ -252,6 +254,14 @@ document.addEventListener('DOMContentLoaded', function() {
         annotations: annotationsData,
         annotationIds: [{% for annotation in annotations %}{{ annotation.id }}{% if not loop.last %},{% endif %}{% endfor %}],
         labelIds: [{% for annotation in annotations %}{{ annotation.label_id }}{% if not loop.last %},{% endif %}{% endfor %}]
+    });
+    
+    // Debug: Log loaded data
+    console.log('Annotation tool initialized with:', {
+        imageWidth: {{ image.width }},
+        imageHeight: {{ image.height }},
+        labelsCount: Object.keys(labelsData).length,
+        annotationsCount: annotationsData.length
     });
 
     // Label selection

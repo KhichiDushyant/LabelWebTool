@@ -169,12 +169,11 @@ class AnnotationBox {
         const screenWidth = this.width * renderer.scale;
         const screenHeight = this.height * renderer.scale;
         
-        console.log(`Drawing annotation at image coords (${this.x}, ${this.y}) -> screen coords (${screenCoords.x}, ${screenCoords.y})`);
-        console.log(`Box dimensions: ${this.width}x${this.height} -> ${screenWidth}x${screenHeight}`);
+        console.log(`Drawing annotation: image(${this.x},${this.y},${this.width}x${this.height}) -> screen(${screenCoords.x},${screenCoords.y},${screenWidth}x${screenHeight})`);
         
-        // Ensure we have valid coordinates
+        // Validate coordinates
         if (isNaN(screenCoords.x) || isNaN(screenCoords.y) || isNaN(screenWidth) || isNaN(screenHeight)) {
-            console.error('Invalid coordinates for annotation:', this);
+            console.error('Invalid coordinates for annotation');
             return;
         }
         
@@ -192,7 +191,7 @@ class AnnotationBox {
         
         // Draw fill for selected/hover
         if (this.selected || this.hover) {
-            ctx.fillStyle = this.color + '20'; // 20 for alpha
+            ctx.fillStyle = this.color + '20';
             ctx.fillRect(
                 screenCoords.x,
                 screenCoords.y,
