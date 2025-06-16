@@ -282,7 +282,6 @@ def reextract_video_frames(project_id):
         return jsonify({'error': 'No video file found'}), 400
     
     data = request.get_json()
-    frame_interval = int(data.get('frame_interval', 30))
     
     try:
         # Delete existing frames
@@ -293,14 +292,26 @@ def reextract_video_frames(project_id):
         project.processing_status = 'processing'
         db.session.commit()
         
-        extracted_frames = extract_video_frames(project.video_filepath, project_id, frame_interval)
+        # Check if using FPS-based extraction or frame interval
+        if 'target_fps' in data:
+            target_fps = int(data.get('target_fps', 1))
+            if target_fps == 0:  # Extract all frames
+                extracted_frames = extract_video_frames_by_fps(project.video_filepath, project_id, None)
+                message = f'Extracted all frames'
+            else:
+                extracted_frames = extract_video_frames_by_fps(project.video_filepath, project_id, target_fps)
+                message = f'Extracted frames at {target_fps} FPS'
+        else:
+            frame_interval = int(data.get('frame_interval', 30))
+            extracted_frames = extract_video_frames(project.video_filepath, project_id, frame_interval)
+            message = f'Re-extracted {len(extracted_frames)} frames with interval {frame_interval}'
         
         project.processing_status = 'completed'
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'Re-extracted {len(extracted_frames)} frames with interval {frame_interval}',
+            'message': message,
             'total_frames': len(extracted_frames)
         })
     except Exception as e:

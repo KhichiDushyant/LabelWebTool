@@ -77,8 +77,10 @@ class CanvasRenderer {
     draw() {
         if (!this.imageLoaded) return;
         
+        const rect = this.canvas.getBoundingClientRect();
+        
         // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.clearRect(0, 0, rect.width, rect.height);
         
         // Draw image
         this.ctx.drawImage(
@@ -91,9 +93,8 @@ class CanvasRenderer {
     }
     
     screenToImage(screenX, screenY) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = screenX - rect.left - this.offsetX;
-        const y = screenY - rect.top - this.offsetY;
+        const x = screenX - this.offsetX;
+        const y = screenY - this.offsetY;
         
         return {
             x: x / this.scale,

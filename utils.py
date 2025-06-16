@@ -206,6 +206,77 @@ def extract_video_frames(video_path, project_id, frame_interval=30):
     
     return extracted_frames
 
+def extract_video_frames_by_fps(video_path, project_id, target_fps=None):
+    """Extract frames from video based on target FPS"""
+    import cv2
+    from flask import current_app
+    from models import VideoFrame, db
+    
+    cap = cv2.VideoCapture(video_path)
+    original_fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    # Create frames directory
+    frames_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], str(project_id), 'frames')
+    os.makedirs(frames_dir, exist_ok=True)
+    
+    extracted_frames = []
+    
+    if target_fps is None:
+        # Extract all frames
+        frame_interval = 1
+    else:
+        # Calculate frame interval based on target FPS
+        frame_interval = max(1, int(original_fps / target_fps))
+    
+    frame_number = 0
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # Extract frame based on calculated interval
+        if frame_number % frame_interval == 0:
+            timestamp = frame_number / original_fps
+            
+            # Save frame as thumbnail
+            thumbnail_filename = f"frame_{frame_number:06d}.jpg"
+            thumbnail_path = os.path.join(frames_dir, thumbnail_filename)
+            
+            # Resize frame for thumbnail (maintain aspect ratio)
+            max_size = 800
+            if width > height:
+                new_width = max_size
+                new_height = int(height * (max_size / width))
+            else:
+                new_height = max_size
+                new_width = int(width * (max_size / height))
+            
+            resized_frame = cv2.resize(frame, (new_width, new_height))
+            cv2.imwrite(thumbnail_path, resized_frame)
+            
+            # Create VideoFrame record
+            video_frame = VideoFrame(
+                project_id=project_id,
+                frame_number=frame_number,
+                timestamp=timestamp,
+                thumbnail_path=thumbnail_path,
+                width=new_width,
+                height=new_height
+            )
+            db.session.add(video_frame)
+            extracted_frames.append(video_frame)
+        
+        frame_number += 1
+    
+    cap.release()
+    db.session.commit()
+    
+    return extracted_frames
+
 def batch_process_images(image_files, project_id, batch_size=50):
     """Process images in batches for large datasets with progress tracking"""
     from models import Image as ImageModel, db

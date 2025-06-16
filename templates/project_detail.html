@@ -309,9 +309,39 @@
             <div class="modal-body">
                 <form id="reextractForm">
                     <div class="mb-3">
+                        <label class="form-label">Extraction Method</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="extractionMethod" id="methodInterval" value="interval" checked>
+                            <label class="form-check-label" for="methodInterval">
+                                Extract by Frame Interval
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="extractionMethod" id="methodFPS" value="fps">
+                            <label class="form-check-label" for="methodFPS">
+                                Extract by FPS (Frames Per Second)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="intervalSection">
                         <label for="frameInterval" class="form-label">Frame Interval</label>
                         <input type="number" class="form-control" id="frameInterval" value="30" min="1" max="300" required>
                         <div class="form-text">Extract every N frames (lower = more frames)</div>
+                    </div>
+                    
+                    <div class="mb-3" id="fpsSection" style="display: none;">
+                        <label for="targetFPS" class="form-label">Target FPS</label>
+                        <select class="form-select" id="targetFPS">
+                            <option value="1">1 FPS (1 frame per second)</option>
+                            <option value="2">2 FPS (2 frames per second)</option>
+                            <option value="5">5 FPS (5 frames per second)</option>
+                            <option value="10">10 FPS (10 frames per second)</option>
+                            <option value="15">15 FPS (15 frames per second)</option>
+                            <option value="30">30 FPS (30 frames per second)</option>
+                            <option value="0">All Frames (Original FPS)</option>
+                        </select>
+                        <div class="form-text">Choose how many frames to extract per second of video</div>
                     </div>
                     
                     <div class="alert alert-warning">
@@ -479,13 +509,34 @@ document.getElementById('createLabelBtn').addEventListener('click', function() {
     });
 });
 
+// Toggle between extraction methods
+document.querySelectorAll('input[name="extractionMethod"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        if (this.value === 'interval') {
+            document.getElementById('intervalSection').style.display = 'block';
+            document.getElementById('fpsSection').style.display = 'none';
+        } else {
+            document.getElementById('intervalSection').style.display = 'none';
+            document.getElementById('fpsSection').style.display = 'block';
+        }
+    });
+});
+
 // Re-extract frames functionality
 document.getElementById('reextractBtn')?.addEventListener('click', function() {
-    const frameInterval = document.getElementById('frameInterval').value;
+    const extractionMethod = document.querySelector('input[name="extractionMethod"]:checked').value;
+    let requestData = {};
     
-    if (!frameInterval || frameInterval < 1) {
-        alert('Please enter a valid frame interval');
-        return;
+    if (extractionMethod === 'interval') {
+        const frameInterval = document.getElementById('frameInterval').value;
+        if (!frameInterval || frameInterval < 1) {
+            alert('Please enter a valid frame interval');
+            return;
+        }
+        requestData = { frame_interval: parseInt(frameInterval) };
+    } else {
+        const targetFPS = document.getElementById('targetFPS').value;
+        requestData = { target_fps: parseInt(targetFPS) };
     }
     
     const btn = this;
@@ -498,7 +549,7 @@ document.getElementById('reextractBtn')?.addEventListener('click', function() {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ frame_interval: parseInt(frameInterval) })
+        body: JSON.stringify(requestData)
     })
     .then(response => response.json())
     .then(data => {
